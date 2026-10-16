@@ -131,8 +131,11 @@ proc dynasmPush*(a: var auto, op: Operand, isX64: bool) =
     else:
       a.push(0x68'u8)
       a.pushU32(cast[uint32](v))
+  elif op.kind == okMem:
+    let sz = if op.memSize != szNone: op.memSize else: sz64
+    encPushMem(a, op.mem, sz, isX64)
   else:
-    raise impossibleRelocation("push only reg/imm here")
+    raise impossibleRelocation("push only reg/imm/mem here")
 
 proc dynasmPop*(a: var auto, op: Operand, isX64: bool) =
   if op.kind == okReg:

@@ -139,6 +139,8 @@ proc a64Entries*(mn: string): seq[A64Entry] =
       (0x0B000000'u32, @[asW, asW, asW], fRRR, -1),
       (0x0B000000'u32, @[asW, asW, asW, asMod], fRRR, -1),
       (0x0B000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
+      # SP is legal in Rd/Rn (not Rm) of ADD shifted-register.
+      (0x8B000000'u32, @[asXSP, asXSP, asX], fRRR, -1),
       (0x91000000'u32, @[asXSP, asXSP, asImm], fRRI12, -1),
       (0x91000000'u32, @[asXSP, asXSP, asImm, asMod, asImm], fRRI12, -1),
       (0x11000000'u32, @[asWSP, asWSP, asImm], fRRI12, -1),
@@ -164,7 +166,10 @@ proc a64Entries*(mn: string): seq[A64Entry] =
       (0xCB000000'u32, @[asX, asX, asX], fRRR, -1),
       (0xCB000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
       (0x4B000000'u32, @[asW, asW, asW], fRRR, -1),
+      (0x4B000000'u32, @[asW, asW, asW, asMod], fRRR, -1),
       (0x4B000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
+      # SP is legal in Rd/Rn (not Rm) of SUB shifted-register.
+      (0xCB000000'u32, @[asXSP, asXSP, asX], fRRR, -1),
       (0xD1000000'u32, @[asXSP, asXSP, asImm], fRRI12, -1),
       (0xD1000000'u32, @[asXSP, asXSP, asImm, asMod, asImm], fRRI12, -1),
       (0x51000000'u32, @[asWSP, asWSP, asImm], fRRI12, -1),

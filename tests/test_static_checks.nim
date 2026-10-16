@@ -517,3 +517,22 @@ test "cset rules":
     dynasm ops:
       arch aarch64
       cset w9, eq
+
+test "push memory size rules":
+  var ops = initVecAssembler(0)
+  rejects:
+    dynasm ops:
+      arch x64
+      push [rax]
+  rejects:
+    dynasm ops:
+      arch x64
+      push dword [rax]
+  accepts:
+    dynasm ops:
+      arch x64
+      push qword [rax]
+  accepts:
+    dynasm ops:
+      arch x64
+      push word [rax]

@@ -152,6 +152,19 @@ proc encPushReg*(a: var auto, reg: Register, isX64: bool) =
     a.push(0x41'u8)
   a.push(cast[uint8](0x50 or (reg.code and 7)))
 
+proc encPushMem*(a: var auto, mem: MemOp, size: OpSize, isX64: bool) =
+  ## PUSH m16/m64: FF /6. 8/32-bit memory pushes do not exist.
+  if size != sz16 and size != sz64:
+    raise impossibleRelocation("push memory needs 16/64-bit size")
+  if size == sz16:
+    a.push(0x66'u8)
+  var b, x: bool
+  if mem.hasBase and (mem.base.code and 8) != 0: b = true
+  if mem.hasIndex and (mem.index.code and 8) != 0: x = true
+  emitRexIfNeeded(a, false, false, x, b)
+  a.push(0xFF'u8)
+  emitMemModRMSIB(a, mem, 6, isX64)
+
 proc encPopReg*(a: var auto, reg: Register, isX64: bool) =
   let b = (reg.code and 8) != 0
   if isX64 and b:

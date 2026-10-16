@@ -236,3 +236,19 @@ test "aarch64 cset":
   check word(code, 12) == 0x9A9F07E5'u32 # cset x5, ne (clang-verified)
   check word(code, 16) == 0x1A9F37E1'u32 # cset w1, hs (clang-verified)
   check word(code, 20) == 0xD65F03C0'u32
+
+test "aarch64 add/sub sp with register":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch aarch64
+    add sp, sp, x9
+    sub sp, sp, x9
+    add x0, x1, x2
+    ret()
+  let code = ops.finalize()
+  # shifted-register LSL #0 (clang picks the equivalent UXTX #0
+  # extended form 8B2963FF/CB2963FF; same semantics).
+  check word(code, 0) == 0x8B0903FF'u32
+  check word(code, 4) == 0xCB0903FF'u32
+  check word(code, 8) == 0x8B020020'u32
+  check word(code, 12) == 0xD65F03C0'u32

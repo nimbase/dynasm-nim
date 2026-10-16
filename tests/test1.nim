@@ -92,3 +92,23 @@ test "dynamic labels":
   encRet(v)
   let code = v.finalize()
   check code.len == 6
+
+test "vec assembler push mem64":
+  var v = initVecAssembler(0)
+  var mem = MemOp(hasBase: true, base: rbx,
+    hasIndex: false, index: rax, scale: 1,
+    disp: 16, hasDisp: true,
+    hasRip: false, addrSizeOverride: false,
+    ripLabel: fwd("unused"))
+  encPushMem(v, mem, sz64, true)
+  # push qword [rbx+16]: FF 73 10 (clang-verified)
+  check v.finalize() == @[0xFF'u8, 0x73'u8, 0x10'u8]
+  var v2 = initVecAssembler(0)
+  var mem2 = MemOp(hasBase: true, base: r12,
+    hasIndex: false, index: rax, scale: 1,
+    disp: 8, hasDisp: true,
+    hasRip: false, addrSizeOverride: false,
+    ripLabel: fwd("unused"))
+  encPushMem(v2, mem2, sz64, true)
+  # push qword [r12+8]: 41 FF 74 24 08 (clang-verified)
+  check v2.finalize() == @[0x41'u8, 0xFF'u8, 0x74'u8, 0x24'u8, 0x08'u8]

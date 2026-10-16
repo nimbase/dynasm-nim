@@ -884,9 +884,13 @@ proc validateIncDec(mn: string, args: seq[NimNode],
 proc validatePush(args: seq[NimNode], aliases: Table[string, string],
     stmt: NimNode) =
   let k = classifyOperand(args[0], aliases)
-  if k.kind != oskReg and k.kind != oskImm and k.kind != oskOther:
-    error("dynasm: 'push' supports registers and immediates only",
-      args[0])
+  if k.kind != oskReg and k.kind != oskImm and k.kind != oskMem and
+      k.kind != oskOther:
+    error("dynasm: 'push' supports registers, immediates and " &
+      "memory only", args[0])
+  if k.kind == oskMem and k.size != "sz16" and k.size != "sz64":
+    error("dynasm: 'push' memory needs an explicit size, e.g. " &
+      "push qword [rbx]", args[0])
   if k.kind == oskImm and k.isLit:
     let v = k.lit
     if not (v >= -128 and v <= 127) and
