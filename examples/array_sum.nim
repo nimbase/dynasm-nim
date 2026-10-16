@@ -37,14 +37,19 @@ when isMainModule:
   const N = 100_000
   var data = newSeq[int64](N)
   for i in 0..<N: data[i] = int64(i + 1)
+  let bt0 = getMonoTime()
   var buf = buildAsum()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let asum = cast[AsumFn](buf.ptrAt(AssemblyOffset(0)))
   let expected = N.int64 * (N.int64 + 1) div 2
   assert asum(cast[pointer](addr data[0]), int64(N)) == expected
   let iters = benchIters(500)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += asum(cast[pointer](addr data[0]), int64(N))
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == expected * iters
-  echo "asum(1..", N, ") = ", expected, " x", iters, " iters"
+  echo "asum(1..", N, ") = ", expected, " x", iters, " iters: ", rep
   buf.destroy()

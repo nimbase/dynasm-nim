@@ -44,16 +44,21 @@ proc gcdRef(a, b: int64): int64 =
   x
 
 when isMainModule:
+  let bt0 = getMonoTime()
   var buf = buildGcd()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let gcd = cast[GcdFn](buf.ptrAt(AssemblyOffset(0)))
   for (x, y) in [(48'i64, 18'i64), (1071, 462), (123456789, 987654321),
       (0, 7), (13, 13)]:
     assert gcd(x, y) == gcdRef(x, y), "mismatch at " & $x & "," & $y
   let iters = benchIters(800_000)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += gcd(123456789, 987654321)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == gcdRef(123456789, 987654321) * iters
   echo "gcd(123456789,987654321) = ", gcd(123456789, 987654321),
-    " x", iters, " iters"
+    " x", iters, " iters: ", rep
   buf.destroy()

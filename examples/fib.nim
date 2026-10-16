@@ -52,14 +52,19 @@ proc fibRef(n: int64): int64 =
     b
 
 when isMainModule:
+  let bt0 = getMonoTime()
   var buf = buildFib()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let fib = cast[FibFn](buf.ptrAt(AssemblyOffset(0)))
   for n in 0'i64..25'i64:
     assert fib(n) == fibRef(n), "mismatch at " & $n
   let iters = benchIters(500_000)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += fib(30)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == fibRef(30) * iters
-  echo "fib(30) = ", fib(30), " x", iters, " iters" # 832040
+  echo "fib(30) = ", fib(30), " x", iters, " iters: ", rep # 832040
   buf.destroy()

@@ -42,7 +42,9 @@ when isMainModule:
   for i in 0..<N:
     xs[i] = int64(i mod 100)
     ys[i] = int64((3 * i + 7) mod 100)
+  let bt0 = getMonoTime()
   var buf = buildDot()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let dot = cast[DotFn](buf.ptrAt(AssemblyOffset(0)))
   var expected = 0'i64
   for i in 0..<N: expected += xs[i] * ys[i]
@@ -50,9 +52,12 @@ when isMainModule:
     int64(N)) == expected
   let iters = benchIters(2_000)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += dot(cast[pointer](addr xs[0]), cast[pointer](addr ys[0]),
       int64(N))
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == expected * iters
-  echo "dot(10k) = ", expected, " x", iters, " iters"
+  echo "dot(10k) = ", expected, " x", iters, " iters: ", rep
   buf.destroy()

@@ -85,18 +85,23 @@ when isMainModule:
       for k in 0..<N:
         s += aa[i * N + k] * bb[k * N + j]
       refC[i * N + j] = s
+  let bt0 = getMonoTime()
   var buf = buildMatmul()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let matmul = cast[MatmulFn](buf.ptrAt(AssemblyOffset(0)))
   matmul(cast[pointer](addr aa[0]), cast[pointer](addr bb[0]),
     cast[pointer](addr cc[0]), int64(N))
   assert cc == refC, "mismatch"
   let iters = benchIters(2)
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     for v in cc.mitems: v = 0
     matmul(cast[pointer](addr aa[0]), cast[pointer](addr bb[0]),
       cast[pointer](addr cc[0]), int64(N))
     assert cc == refC
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   var chk = 0'i64
   for v in cc: chk += v
-  echo "matmul(480) checksum ", chk, " x", iters, " iters"
+  echo "matmul(480) checksum ", chk, " x", iters, " iters: ", rep
   buf.destroy()

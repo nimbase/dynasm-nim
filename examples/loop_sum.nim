@@ -30,14 +30,19 @@ proc buildSum(): ExecutableBuffer =
   a.finalize()
 
 when isMainModule:
+  let bt0 = getMonoTime()
   var buf = buildSum()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let sumTo = cast[SumFn](buf.ptrAt(AssemblyOffset(0)))
   for n in [0'i64, 1, 2, 10, 100, 1000]:
     assert sumTo(n) == n * (n + 1) div 2, "mismatch at " & $n
   let iters = benchIters(100)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += sumTo(1_000_000)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == 500_000_500_000'i64 * iters
-  echo "sumTo(1000000) = ", sumTo(1_000_000), " x", iters, " iters" # 500000500000
+  echo "sumTo(1000000) = ", sumTo(1_000_000), " x", iters, " iters: ", rep # 500000500000
   buf.destroy()

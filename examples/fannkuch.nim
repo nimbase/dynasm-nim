@@ -146,13 +146,18 @@ proc runJit(fannkuch: FannkuchFn, n: int): int64 =
 
 when isMainModule:
   assert fannkuchRef(N) == 38
+  let bt0 = getMonoTime()
   var buf = buildFannkuch()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let fannkuch = cast[FannkuchFn](buf.ptrAt(AssemblyOffset(0)))
   assert runJit(fannkuch, N) == 38
   let iters = benchIters(2)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += runJit(fannkuch, N)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == 38 * iters
-  echo "fannkuch(10) = 38 x", iters, " iters"
+  echo "fannkuch(10) = 38 x", iters, " iters: ", rep
   buf.destroy()

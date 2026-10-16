@@ -78,7 +78,9 @@ proc sieveRef(n: int): seq[bool] =
 
 when isMainModule:
   const N = 100
+  let bt0 = getMonoTime()
   var buf = buildSieve()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let sieve = cast[SieveFn](buf.ptrAt(AssemblyOffset(0)))
   # NOTE: use uint8, not byte — dynasm exports size-marker procs
   # named byte/word/dword/qword that shadow the builtin type.
@@ -92,13 +94,19 @@ when isMainModule:
   for f in flags:
     if f != 0: inc count
   assert count == 25
+  # The JIT fill loop rewrites every flag itself, so no reset is needed:
+  # the timed loop below holds only pure sieve calls plus one O(1)
+  # liveness witness per call. Full verification runs after the loop.
   let iters = benchIters(50_000)
   var acc = 0
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
-    for i in 0..<N: flags[i] = 1'u8
     sieve(cast[pointer](addr flags[0]), int64(N))
-    for f in flags:
-      if f != 0: inc acc
-  assert acc == 25 * iters
-  echo "primes below 100: ", count, " x", iters, " iters" # via sieve
+    acc += int(flags[2]) # 2 is prime; keeps every call live
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
+  assert acc == iters
+  for i in 0..<N:
+    assert (flags[i] != 0) == expected[i], "mismatch at " & $i
+  echo "primes below 100: ", count, " x", iters, " pure-JIT calls: ", rep
   buf.destroy()

@@ -116,7 +116,9 @@ when isMainModule:
   const Steps = 200_000'i64
   var interactP: InteractFn = interact
   var integrateP: IntegrateFn = integrate
+  let bt0 = getMonoTime()
   var buf = buildNbodyFloat()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let nbodyf = cast[NbodyFloatFn](buf.ptrAt(AssemblyOffset(0)))
   # correctness on a short run
   var st = initBodies()
@@ -126,10 +128,13 @@ when isMainModule:
   runRef(rf, 500)
   assert st == rf, "mismatch after 500 steps"
   let iters = benchIters(3)
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     st = initBodies()
     nbodyf(cast[pointer](addr st[0]), Steps,
       cast[pointer](interactP), cast[pointer](integrateP))
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   var chk = 0.0
   for v in st: chk += v
   rf = initBodies()
@@ -138,5 +143,5 @@ when isMainModule:
   for v in rf: chkRef += v
   assert chk == chkRef
   echo "nbody_float(5 bodies, ", Steps, " steps) checksum ", chk,
-    " x", iters, " iters"
+    " x", iters, " iters: ", rep
   buf.destroy()

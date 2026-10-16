@@ -114,15 +114,20 @@ proc queensRef(n: int): int =
 
 when isMainModule:
   assert queensRef(N) == 73712
+  let bt0 = getMonoTime()
   var buf = buildQueens()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let queens = cast[QueensFn](buf.ptrAt(AssemblyOffset(0)))
   var cols = newSeq[int64](N)
   let v = queens(cast[pointer](addr cols[0]), int64(N))
   assert v == 73712, "got " & $v
   let iters = benchIters(1)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += queens(cast[pointer](addr cols[0]), int64(N))
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == 73712 * iters
-  echo "queens(13) = ", v, " x", iters, " iters"
+  echo "queens(13) = ", v, " x", iters, " iters: ", rep
   buf.destroy()

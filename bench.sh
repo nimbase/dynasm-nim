@@ -8,11 +8,14 @@
 #   RUNS=30 WARMUP=5 ./bench.sh  # tune hyperfine run counts
 #   RESULTS=bench/custom ./bench.sh  # change export directory
 #
-# Each example binary assembles its JIT function, verifies it once against
-# a native Nim reference, then hammers the hot call BENCH_ITERS times
-# (env override, per-example default) with a checksum assert, so
-# hyperfine measures steady-state JIT throughput instead of process
-# startup. Results are exported as Markdown and JSON next to the binaries.
+# Each example binary assembles its JIT function (timed), verifies it once
+# against a native Nim reference, then hammers the hot call BENCH_ITERS
+# times (env override, per-example default) with a checksum assert while
+# stamping std/monotimes wall time and std/times cpuTime around the loop.
+# hyperfine therefore measures rigorous end-to-end numbers (with warmup,
+# statistics and outlier rejection) while each binary self-reports the
+# spawn-free per-call throughput. Results are exported as Markdown and
+# JSON next to the binaries.
 
 set -euo pipefail
 

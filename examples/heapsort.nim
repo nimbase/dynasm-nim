@@ -102,7 +102,9 @@ when isMainModule:
   for t in 0..<8:
     cases[t] = newSeq[int64](5000)
     for i in 0..<5000: cases[t][i] = rand(-100000..100000).int64
+  let bt0 = getMonoTime()
   var buf = buildHsort()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let hsort = cast[HsortFn](buf.ptrAt(AssemblyOffset(0)))
   runCases(hsort, cases)
   var mins = 0'i64
@@ -112,13 +114,29 @@ when isMainModule:
       if v < m: m = v
     mins += m
   let iters = benchIters(5)
+  let perIter = cases.len
+  let chunkLen = cases[0].len
+  let totalCalls = iters * perIter
+  # One fresh input per timed call, staged before t0: the JIT sort
+  # mutates its buffer in place.
+  var want = newSeq[seq[int64]](perIter)
+  for t in 0..<perIter: want[t] = sorted(cases[t])
+  var scratch = newSeq[int64](totalCalls * chunkLen)
+  for k in 0..<totalCalls:
+    let src = cases[k mod perIter]
+    for i in 0..<chunkLen: scratch[k * chunkLen + i] = src[i]
   var acc = 0'i64
-  for _ in 0..<iters:
-    for t in 0..<cases.len:
-      var data = newSeq[int64](cases[t].len)
-      for i in 0..<data.len: data[i] = cases[t][i]
-      hsort(cast[pointer](addr data[0]), int64(data.len))
-      acc += data[0]
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
+  for k in 0..<totalCalls:
+    hsort(cast[pointer](addr scratch[k * chunkLen]), int64(chunkLen))
+    acc += scratch[k * chunkLen] # minimum element, invariant under sorting
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, totalCalls)
   assert acc == mins * iters
-  echo "heapsort(8x5000) ok x", iters, " iters"
+  for k in 0..<totalCalls:
+    let w = want[k mod perIter]
+    for i in 0..<chunkLen:
+      assert scratch[k * chunkLen + i] == w[i], "unsorted on call " & $k
+  echo "heapsort(8x5000) ok x", iters, " iters x", perIter, " sorts (",
+    totalCalls, " pure-JIT calls): ", rep
   buf.destroy()

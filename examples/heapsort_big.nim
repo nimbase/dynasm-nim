@@ -88,16 +88,27 @@ when isMainModule:
   var base = newSeq[int64](N)
   for i in 0..<N: base[i] = rand(-1000000..1000000).int64
   let expected = sorted(base)
+  let bt0 = getMonoTime()
   var buf = buildHsort()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let hsort = cast[HsortFn](buf.ptrAt(AssemblyOffset(0)))
   var data = newSeq[int64](N)
   for i in 0..<N: data[i] = base[i]
   hsort(cast[pointer](addr data[0]), int64(N))
   assert data == expected, "mismatch"
   let iters = benchIters(1)
-  for _ in 0..<iters:
-    for i in 0..<N: data[i] = base[i]
-    hsort(cast[pointer](addr data[0]), int64(N))
-    assert data == expected
-  echo "heapsort(200k) ok x", iters, " iters"
+  # One fresh 200k copy per timed call, staged before t0; the full
+  # equality check moves after the loop.
+  var copies = newSeq[seq[int64]](iters)
+  for k in 0..<iters:
+    copies[k] = newSeq[int64](N)
+    for i in 0..<N: copies[k][i] = base[i]
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
+  for k in 0..<iters:
+    hsort(cast[pointer](addr copies[k][0]), int64(N))
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
+  for k in 0..<iters:
+    assert copies[k] == expected, "mismatch on copy " & $k
+  echo "heapsort(200k) ok x", iters, " pure-JIT iters: ", rep
   buf.destroy()

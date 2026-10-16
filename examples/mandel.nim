@@ -78,7 +78,9 @@ proc mandelRef(cx, cy: int64): int64 =
   i
 
 when isMainModule:
+  let bt0 = getMonoTime()
   var buf = buildMandel()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let mandel = cast[MandelFn](buf.ptrAt(AssemblyOffset(0)))
   for (cx, cy) in [(-512'i64, 0'i64), (0, 0), (256, 0), (-128, 256)]:
     assert mandel(cx, cy) == mandelRef(cx, cy),
@@ -93,7 +95,11 @@ when isMainModule:
     echo line
   let iters = benchIters(200_000)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += mandel(0, 0)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == mandelRef(0, 0) * iters
+  echo "mandel(0,0) x", iters, " iters: ", rep
   buf.destroy()

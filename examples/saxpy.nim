@@ -47,15 +47,20 @@ when isMainModule:
     ys[i] = int64((i * 7) mod 1000)
   const A = 3'i64
   for i in 0..<N: refY[i] = A * xs[i] + ys[i]
+  let bt0 = getMonoTime()
   var buf = buildSaxpy()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let saxpy = cast[SaxpyFn](buf.ptrAt(AssemblyOffset(0)))
   saxpy(A, cast[pointer](addr xs[0]), cast[pointer](addr ys[0]), int64(N))
   assert ys == refY, "mismatch"
   let iters = benchIters(20)
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     for i in 0..<N: ys[i] = int64((i * 7) mod 1000)
     saxpy(A, cast[pointer](addr xs[0]), cast[pointer](addr ys[0]),
       int64(N))
     assert ys == refY
-  echo "saxpy(1M) ok x", iters, " iters"
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
+  echo "saxpy(1M) ok x", iters, " iters: ", rep
   buf.destroy()

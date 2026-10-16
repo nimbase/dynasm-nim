@@ -62,7 +62,9 @@ proc isPrimeRef(n: int64): bool =
   true
 
 when isMainModule:
+  let bt0 = getMonoTime()
   var buf = buildIsPrime()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let isPrime = cast[IsPrimeFn](buf.ptrAt(AssemblyOffset(0)))
   var count = 0
   for n in 0'i64..99'i64:
@@ -72,9 +74,12 @@ when isMainModule:
   assert count == 25
   let iters = benchIters(60_000)
   var acc = 0
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     for n in 0'i64..99'i64:
       acc += int(isPrime(n))
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == 25 * iters
-  echo "primes below 100: ", count, " x", iters, " iters" # 25
+  echo "primes below 100: ", count, " x", iters, " iters: ", rep # 25
   buf.destroy()

@@ -40,17 +40,22 @@ when isMainModule:
   var bins = newSeq[int64](Bins)
   var refBins = newSeq[int64](Bins)
   for b in data: refBins[int(b)] += 1
+  let bt0 = getMonoTime()
   var buf = buildHist()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let hist = cast[HistFn](buf.ptrAt(AssemblyOffset(0)))
   for b in bins.mitems: b = 0
   hist(cast[pointer](addr data[0]), int64(N),
     cast[pointer](addr bins[0]))
   assert bins == refBins, "mismatch"
   let iters = benchIters(3)
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     for b in bins.mitems: b = 0
     hist(cast[pointer](addr data[0]), int64(N),
       cast[pointer](addr bins[0]))
     assert bins == refBins
-  echo "histogram_big(32M) ok x", iters, " iters"
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
+  echo "histogram_big(32M) ok x", iters, " iters: ", rep
   buf.destroy()

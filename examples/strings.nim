@@ -116,8 +116,10 @@ when isMainModule:
   for i in 0..N: text2[i] = text[i]
   text2[N - 1] = text[N - 1] + 1 # differ in last byte
   var copy = newSeq[uint8](N + 1)
+  let bt0 = getMonoTime()
   var parts = buildStrings()
   var buf = parts.buf
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let strlen = cast[StrlenFn](buf.ptrAt(parts.strlen))
   let strcmp = cast[StrcmpFn](buf.ptrAt(parts.strcmp))
   let strcpy = cast[StrcpyFn](buf.ptrAt(parts.strcpy))
@@ -138,6 +140,8 @@ when isMainModule:
   # of association order.
   let iters = benchIters(300)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc = acc +% strlen(cast[pointer](addr text[0]))
     acc = acc +% strcmp(cast[pointer](addr text[0]),
@@ -145,8 +149,9 @@ when isMainModule:
     acc = acc +% strcpy(cast[pointer](addr copy[0]),
       cast[pointer](addr text[0]))
     acc = acc +% strhash(cast[pointer](addr text[0]), int64(N))
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   let one = int64(strlenRef(text)) +% strcmpRef(text, text2) +%
     int64(N + 1) +% cast[int64](strhashRef(text.toOpenArray(0, N - 1)))
   assert acc == one *% iters
-  echo "strings(64k) ok x", iters, " iters"
+  echo "strings(64k) ok x", iters, " iters: ", rep
   buf.destroy()

@@ -95,7 +95,9 @@ proc stepRef(s: var seq[int64]) =
 
 when isMainModule:
   const Steps = 5_000_000'i64
+  let bt0 = getMonoTime()
   var buf = buildNbody()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let nbody = cast[NbodyFn](buf.ptrAt(AssemblyOffset(0)))
   # correctness on a short run
   var st = initState()
@@ -105,9 +107,12 @@ when isMainModule:
   assert st == rf, "mismatch after 1000 steps"
   # timed full run
   let iters = benchIters(1)
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     st = initState()
     nbody(cast[pointer](addr st[0]), Steps)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   var chk = 0'i64
   for v in st: chk = chk +% v
   var rf2 = initState()
@@ -117,5 +122,5 @@ when isMainModule:
   for v in rf2: chkRef = chkRef +% v
   assert chk == chkRef
   echo "nbody(5 bodies, ", Steps, " steps) checksum ", chk,
-    " x", iters, " iters"
+    " x", iters, " iters: ", rep
   buf.destroy()

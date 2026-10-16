@@ -46,14 +46,19 @@ proc nestedRef(n, m: int64): int64 =
   (n * (n - 1) div 2) * (m * (m - 1) div 2)
 
 when isMainModule:
+  let bt0 = getMonoTime()
   var buf = buildNested()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let nested = cast[NestedFn](buf.ptrAt(AssemblyOffset(0)))
   for (n, m) in [(0'i64, 0'i64), (1, 10), (10, 10), (37, 41)]:
     assert nested(n, m) == nestedRef(n, m), "mismatch at " & $n & "," & $m
   let iters = benchIters(200)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += nested(500, 500)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == nestedRef(500, 500) * iters
-  echo "nested(500,500) = ", nested(500, 500), " x", iters, " iters"
+  echo "nested(500,500) = ", nested(500, 500), " x", iters, " iters: ", rep
   buf.destroy()

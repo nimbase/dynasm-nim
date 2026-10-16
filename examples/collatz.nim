@@ -51,14 +51,19 @@ proc stepsRef(n: int64): int64 =
     inc result
 
 when isMainModule:
+  let bt0 = getMonoTime()
   var buf = buildSteps()
+  echo "assembled ", buf.len, " bytes in ", shortDur(getMonoTime() - bt0)
   let steps = cast[StepsFn](buf.ptrAt(AssemblyOffset(0)))
   for n in [1'i64, 2, 3, 6, 27, 97, 871]:
     assert steps(n) == stepsRef(n), "mismatch at " & $n
   let iters = benchIters(300_000)
   var acc = 0'i64
+  let t0 = getMonoTime()
+  let c0 = cpuTime()
   for _ in 0..<iters:
     acc += steps(27)
+  let rep = benchReport(getMonoTime() - t0, cpuTime() - c0, iters)
   assert acc == stepsRef(27) * iters
-  echo "collatz steps(27) = ", steps(27), " x", iters, " iters"
+  echo "collatz steps(27) = ", steps(27), " x", iters, " iters: ", rep
   buf.destroy()
