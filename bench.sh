@@ -57,8 +57,8 @@ for ex in "${EXAMPLES[@]}"; do
 done
 
 # Collect each binary's self-reported numbers into a Markdown table.
-TABLE="| example | bytes | assembled in | result | wall | cpu | per call |
-|---|---|---|---|---|---|---|"
+TABLE="| example | bytes | assembled in | wall | cpu | per call |
+|---|---|---|---|---|---|"
 for ex in "${EXAMPLES[@]}"; do
   log="$RESULTS/$ex.log"
   asm="$(grep -m1 '^assembled ' "$log" || true)"
@@ -68,13 +68,12 @@ for ex in "${EXAMPLES[@]}"; do
   # Split at the trailing "<wall> wall, <cpu> cpu, <per>/call" suffix;
   # result details may themselves contain colons (e.g. sieve).
   timing="$(echo "$line" | sed 's/^.*: \([0-9.]* [a-z]* wall, .*\/call\)$/\1/')"
-  detail="$(echo "$line" | sed 's/: [0-9.]* [a-z]* wall, .*\/call$//')"
   wall="${timing%% wall,*}"
   rest="${timing#*, }"
   cpu="${rest%% cpu,*}"
   per="${rest##*, }"
   TABLE="$TABLE
-| $ex | $bytes | $asmtime | $detail | $wall | $cpu | $per |"
+| $ex | $bytes | $asmtime | $wall | $cpu | $per |"
 done
 
 echo "$TABLE" | tee "$RESULTS/SUMMARY.md"
