@@ -1358,7 +1358,6 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
           "write prefix as `db 0xF0` + instruction on next line", stmt)
       else:
         error("lock/rep needs instruction after it", stmt)
-      continue
 
     # AArch64 instructions: unified DSL, per-arch tables.
     if curArchA64:

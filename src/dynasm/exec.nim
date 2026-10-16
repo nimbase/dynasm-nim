@@ -12,6 +12,10 @@ when defined(windows):
   # std/winlean is a lean subset: it has DWORD and the PAGE_* flags
   # but none of the virtual-memory API, so declare what we use.
   # (kernel32; stdcall is the 32-bit ABI, unified on 64-bit.)
+  # Note: winlean's DWORD is int32, but the real Windows DWORD is
+  # unsigned long, and VirtualProtect takes PDWORD (pointer) for its
+  # last arg, so we need an exactly-matching unsigned type here.
+  type WinDword = culong
   type SIZE_T = csize_t
   const
     MEM_COMMIT = 0x1000.DWORD
@@ -22,7 +26,7 @@ when defined(windows):
     header: "<windows.h>", stdcall.}
   proc VirtualProtect(lpAddress: pointer, dwSize: SIZE_T,
     flNewProtect: DWORD,
-    lpflOldProtect: ptr DWORD): WINBOOL {.importc,
+    lpflOldProtect: ptr WinDword): WINBOOL {.importc,
     header: "<windows.h>", stdcall.}
   proc VirtualFree(lpAddress: pointer, dwSize: SIZE_T,
     dwFreeType: DWORD): WINBOOL {.importc,
@@ -128,7 +132,7 @@ proc allocWritable*(size: int): tuple[mem: pointer, mapped: int] =
 proc makeExecutable*(mem: pointer, mapped, length: int) =
   if mem == nil: return
   when defined(windows):
-    var oldProtect: DWORD
+    var oldProtect: WinDword
     if VirtualProtect(mem, SIZE_T(mapped), PAGE_EXECUTE_READ,
         addr oldProtect) == 0:
       raise newException(IOError, "VirtualProtect RX failed")
@@ -151,7 +155,7 @@ proc makeExecutable*(mem: pointer, mapped, length: int) =
 proc makeWritable*(mem: pointer, mapped: int) =
   if mem == nil: return
   when defined(windows):
-    var oldProtect: DWORD
+    var oldProtect: WinDword
     if VirtualProtect(mem, SIZE_T(mapped), PAGE_READWRITE,
         addr oldProtect) == 0:
       raise newException(IOError, "VirtualProtect RW failed")
