@@ -7,4 +7,7 @@ testresults/
 !/tests/bench
 !/tests/*.nim
 !/tests/*.nims
-
+# Build outputs and local tool state (never commit)
+bin/
+bench/
+clue.lock

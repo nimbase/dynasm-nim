@@ -1,0 +1,59 @@
+# gcd — Euclid's algorithm with `div` in the hot loop.
+#
+# Run with:
+#   nim r examples/gcd.nim
+#
+# JIT signature (SysV AMD64): gcd(a, b: int64): int64.
+# Each iteration divides RDX:RAX by the divisor; the remainder in RDX
+# becomes the next divisor. Shows multi-register division state
+# threaded through a loop.
+
+import dynasm
+import benchutil
+
+type GcdFn = proc(a, b: int64): int64 {.cdecl.}
+
+proc buildGcd(): ExecutableBuffer =
+  var a = newAssembler(akX64)
+  dynasm a:
+    arch x64
+    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
+    alias u, rdi
+    alias v, rsi
+    label loop
+    cmp v, 0
+    je fwd("done")
+    mov rax, u
+    `xor` rdx, rdx
+    `div` v
+    mov u, v
+    mov v, rdx
+    jmp bwd("loop")
+    label done
+    mov rax, u
+    ret()
+  a.finalize()
+
+proc gcdRef(a, b: int64): int64 =
+  var x = a
+  var y = b
+  while y != 0:
+    let t = x mod y
+    x = y
+    y = t
+  x
+
+when isMainModule:
+  var buf = buildGcd()
+  let gcd = cast[GcdFn](buf.ptrAt(AssemblyOffset(0)))
+  for (x, y) in [(48'i64, 18'i64), (1071, 462), (123456789, 987654321),
+      (0, 7), (13, 13)]:
+    assert gcd(x, y) == gcdRef(x, y), "mismatch at " & $x & "," & $y
+  let iters = benchIters(800_000)
+  var acc = 0'i64
+  for _ in 0..<iters:
+    acc += gcd(123456789, 987654321)
+  assert acc == gcdRef(123456789, 987654321) * iters
+  echo "gcd(123456789,987654321) = ", gcd(123456789, 987654321),
+    " x", iters, " iters"
+  buf.destroy()

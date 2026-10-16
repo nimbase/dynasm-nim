@@ -1,0 +1,61 @@
+# histogram — byte-value histogram with `movzx` loads.
+#
+# Run with:
+#   nim r examples/histogram.nim
+#
+# JIT signature (SysV AMD64): hist(data: ptr byte, n: int64,
+# bins: ptr int64). Bins (256 int64 counters, zeroed by the caller)
+# are bumped with a qword read-modify-write per input byte.
+# See histogram_big.nim for the large-input sibling.
+
+import dynasm
+import benchutil
+
+type HistFn = proc(data: pointer, n: int64, bins: pointer) {.cdecl.}
+
+const N = 1_000_000
+const Bins = 256
+
+proc buildHist(): ExecutableBuffer =
+  var a = newAssembler(akX64)
+  dynasm a:
+    arch x64
+    # SysV: args arrive in RDI, RSI, RDX.
+    alias data, rdi
+    alias n, rsi
+    alias bins, rdx
+    `xor` ecx, ecx # i
+    label loop
+    cmp rcx, n
+    jge fwd("done")
+    movzx eax, byte [data + rcx*1]
+    add qword [bins + rax*8], 1
+    add rcx, 1
+    jmp bwd("loop")
+    label done
+    ret()
+  a.finalize()
+
+proc runHist(hist: HistFn, data: var seq[uint8], bins: var seq[int64]) =
+  for b in bins.mitems: b = 0
+  hist(cast[pointer](addr data[0]), int64(data.len),
+    cast[pointer](addr bins[0]))
+
+when isMainModule:
+  var data = newSeq[uint8](N)
+  for i in 0..<N: data[i] = uint8((i * 31 + 7) mod 256)
+  var bins = newSeq[int64](Bins)
+  var refBins = newSeq[int64](Bins)
+  for b in data: refBins[int(b)] += 1
+  var buf = buildHist()
+  let hist = cast[HistFn](buf.ptrAt(AssemblyOffset(0)))
+  runHist(hist, data, bins)
+  assert bins == refBins, "mismatch"
+  let iters = benchIters(30)
+  for _ in 0..<iters:
+    runHist(hist, data, bins)
+    assert bins == refBins
+  var total = 0'i64
+  for b in bins: total += b
+  echo "histogram(1M) total ", total, " x", iters, " iters"
+  buf.destroy()
