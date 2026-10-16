@@ -3,7 +3,7 @@
 version       = "0.1.0"
 author        = "George Lemon"
 description   = "A dynamic assembler written in Nim for Nim"
-license       = "MIT"
+license       = "MPL-2.0"
 srcDir        = "src"
 
 

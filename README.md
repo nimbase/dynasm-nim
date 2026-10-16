@@ -95,4 +95,8 @@ documentation for the original concept.
 - 👋 Wanna help? [Fork it!](https://github.com/nimbase/dynasm-nim/fork)
 
 ### 🎩 License
-MIT license | Nim Community.
+MPL-2.0, same as [dynasm-rs](https://github.com/CensoredUsername/dynasm-rs)
+(which is (c) Alexander Stocko and CensoredUsername). This Source Code Form
+is subject to the terms of the Mozilla Public License, v. 2.0. If a copy
+of the MPL was not distributed with this package, you can obtain one at
+http://mozilla.org/MPL/2.0/ (see LICENSE).
