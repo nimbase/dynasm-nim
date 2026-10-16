@@ -1,0 +1,24 @@
+nimTitle	exec	dynasm/exec.html	module dynasm/exec		0
+nim	DefaultPageSize	dynasm/exec.html#DefaultPageSize	const DefaultPageSize		35
+nim	jitAllowWrites	dynasm/exec.html#jitAllowWrites,bool	proc jitAllowWrites(allow: bool)		51
+nim	pageSize	dynasm/exec.html#pageSize	proc pageSize(): int		76
+nim	ExecutableBuffer	dynasm/exec.html#ExecutableBuffer	object ExecutableBuffer		86
+nim	MutableBuffer	dynasm/exec.html#MutableBuffer	object MutableBuffer		92
+nim	isEmpty	dynasm/exec.html#isEmpty,ExecutableBuffer	proc isEmpty(b: ExecutableBuffer): bool		97
+nim	size	dynasm/exec.html#size,ExecutableBuffer	proc size(b: ExecutableBuffer): int		98
+nim	len	dynasm/exec.html#len,ExecutableBuffer	proc len(b: ExecutableBuffer): int		99
+nim	`[]`	dynasm/exec.html#[],ExecutableBuffer,int	proc `[]`(b: ExecutableBuffer; i: int): byte		101
+nim	toSeq	dynasm/exec.html#toSeq,ExecutableBuffer	proc toSeq(b: ExecutableBuffer): seq[byte]		105
+nim	ptrAt	dynasm/exec.html#ptrAt,ExecutableBuffer,AssemblyOffset	proc ptrAt(b: ExecutableBuffer; off: AssemblyOffset): pointer		110
+nim	allocWritable	dynasm/exec.html#allocWritable,int	proc allocWritable(size: int): tuple[mem: pointer, mapped: int]		114
+nim	makeExecutable	dynasm/exec.html#makeExecutable,pointer,int,int	proc makeExecutable(mem: pointer; mapped, length: int)		132
+nim	makeWritable	dynasm/exec.html#makeWritable,pointer,int	proc makeWritable(mem: pointer; mapped: int)		155
+nim	freeMapping	dynasm/exec.html#freeMapping,pointer,int	proc freeMapping(mem: pointer; mapped: int)		173
+nim	newExecutableBuffer	dynasm/exec.html#newExecutableBuffer,int	proc newExecutableBuffer(size: int): ExecutableBuffer		180
+nim	newMutableBuffer	dynasm/exec.html#newMutableBuffer,int	proc newMutableBuffer(size: int): MutableBuffer		187
+nim	destroy	dynasm/exec.html#destroy,ExecutableBuffer	proc destroy(b: var ExecutableBuffer)		193
+nim	destroy	dynasm/exec.html#destroy,MutableBuffer	proc destroy(b: var MutableBuffer)		199
+nim	writeBytes	dynasm/exec.html#writeBytes,MutableBuffer,openArray[byte]	proc writeBytes(b: var MutableBuffer; data: openArray[byte])		205
+nim	toExecutable	dynasm/exec.html#toExecutable,MutableBuffer	proc toExecutable(b: MutableBuffer): ExecutableBuffer		212
+nim	toMutable	dynasm/exec.html#toMutable,ExecutableBuffer	proc toMutable(b: ExecutableBuffer): MutableBuffer		216
+nimgrp	destroy	dynasm/exec.html#destroy-procs-all	proc		193

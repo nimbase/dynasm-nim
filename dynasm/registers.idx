@@ -1,0 +1,216 @@
+nimTitle	registers	dynasm/registers.html	module dynasm/registers		0
+nim	rcGpr	dynasm/registers.html#rcGpr	RegClass.rcGpr		8
+nim	rcHigh8	dynasm/registers.html#rcHigh8	RegClass.rcHigh8		8
+nim	rcFpu	dynasm/registers.html#rcFpu	RegClass.rcFpu		8
+nim	rcMmx	dynasm/registers.html#rcMmx	RegClass.rcMmx		8
+nim	rcXmm	dynasm/registers.html#rcXmm	RegClass.rcXmm		8
+nim	rcSeg	dynasm/registers.html#rcSeg	RegClass.rcSeg		8
+nim	rcControl	dynasm/registers.html#rcControl	RegClass.rcControl		8
+nim	rcDebug	dynasm/registers.html#rcDebug	RegClass.rcDebug		8
+nim	rcBound	dynasm/registers.html#rcBound	RegClass.rcBound		8
+nim	RegClass	dynasm/registers.html#RegClass	enum RegClass		8
+nim	Register	dynasm/registers.html#Register	object Register		19
+nim	regCode	dynasm/registers.html#regCode,Register	proc regCode(r: Register): uint8		23
+nim	Rq	dynasm/registers.html#Rq,int	proc Rq(idx: int): Register		25
+nim	Rd	dynasm/registers.html#Rd,int	proc Rd(idx: int): Register		26
+nim	Rx	dynasm/registers.html#Rx,int	proc Rx(idx: int): Register		27
+nim	Xreg	dynasm/registers.html#Xreg,int	proc Xreg(idx: int): Register		31
+nim	Wreg	dynasm/registers.html#Wreg,int	proc Wreg(idx: int): Register		33
+nim	rax	dynasm/registers.html#rax	const rax		38
+nim	rcx	dynasm/registers.html#rcx	const rcx		39
+nim	rdx	dynasm/registers.html#rdx	const rdx		40
+nim	rbx	dynasm/registers.html#rbx	const rbx		41
+nim	rsp	dynasm/registers.html#rsp	const rsp		42
+nim	rbp	dynasm/registers.html#rbp	const rbp		43
+nim	rsi	dynasm/registers.html#rsi	const rsi		44
+nim	rdi	dynasm/registers.html#rdi	const rdi		45
+nim	r8	dynasm/registers.html#r8	const r8		46
+nim	r9	dynasm/registers.html#r9	const r9		47
+nim	r10	dynasm/registers.html#r10	const r10		48
+nim	r11	dynasm/registers.html#r11	const r11		49
+nim	r12	dynasm/registers.html#r12	const r12		50
+nim	r13	dynasm/registers.html#r13	const r13		51
+nim	r14	dynasm/registers.html#r14	const r14		52
+nim	r15	dynasm/registers.html#r15	const r15		53
+nim	eax	dynasm/registers.html#eax	const eax		56
+nim	ecx	dynasm/registers.html#ecx	const ecx		57
+nim	edx	dynasm/registers.html#edx	const edx		58
+nim	ebx	dynasm/registers.html#ebx	const ebx		59
+nim	esp	dynasm/registers.html#esp	const esp		60
+nim	ebp	dynasm/registers.html#ebp	const ebp		61
+nim	esi	dynasm/registers.html#esi	const esi		62
+nim	edi	dynasm/registers.html#edi	const edi		63
+nim	r8d	dynasm/registers.html#r8d	const r8d		64
+nim	r9d	dynasm/registers.html#r9d	const r9d		65
+nim	r10d	dynasm/registers.html#r10d	const r10d		66
+nim	r11d	dynasm/registers.html#r11d	const r11d		67
+nim	r12d	dynasm/registers.html#r12d	const r12d		68
+nim	r13d	dynasm/registers.html#r13d	const r13d		69
+nim	r14d	dynasm/registers.html#r14d	const r14d		70
+nim	r15d	dynasm/registers.html#r15d	const r15d		71
+nim	ax	dynasm/registers.html#ax	const ax		74
+nim	cx	dynasm/registers.html#cx	const cx		75
+nim	dx	dynasm/registers.html#dx	const dx		76
+nim	bx	dynasm/registers.html#bx	const bx		77
+nim	sp	dynasm/registers.html#sp	const sp		78
+nim	bp	dynasm/registers.html#bp	const bp		79
+nim	si	dynasm/registers.html#si	const si		80
+nim	di	dynasm/registers.html#di	const di		81
+nim	al	dynasm/registers.html#al	const al		84
+nim	cl	dynasm/registers.html#cl	const cl		85
+nim	dl	dynasm/registers.html#dl	const dl		86
+nim	bl	dynasm/registers.html#bl	const bl		87
+nim	spl	dynasm/registers.html#spl	const spl		88
+nim	bpl	dynasm/registers.html#bpl	const bpl		89
+nim	sil	dynasm/registers.html#sil	const sil		90
+nim	dil	dynasm/registers.html#dil	const dil		91
+nim	r8b	dynasm/registers.html#r8b	const r8b		92
+nim	r9b	dynasm/registers.html#r9b	const r9b		93
+nim	r10b	dynasm/registers.html#r10b	const r10b		94
+nim	r11b	dynasm/registers.html#r11b	const r11b		95
+nim	r12b	dynasm/registers.html#r12b	const r12b		96
+nim	r13b	dynasm/registers.html#r13b	const r13b		97
+nim	r14b	dynasm/registers.html#r14b	const r14b		98
+nim	r15b	dynasm/registers.html#r15b	const r15b		99
+nim	ah	dynasm/registers.html#ah	const ah		102
+nim	ch	dynasm/registers.html#ch	const ch		103
+nim	dh	dynasm/registers.html#dh	const dh		104
+nim	bh	dynasm/registers.html#bh	const bh		105
+nim	x0	dynasm/registers.html#x0	const x0		114
+nim	x1	dynasm/registers.html#x1	const x1		115
+nim	x2	dynasm/registers.html#x2	const x2		116
+nim	x3	dynasm/registers.html#x3	const x3		117
+nim	x4	dynasm/registers.html#x4	const x4		118
+nim	x5	dynasm/registers.html#x5	const x5		119
+nim	x6	dynasm/registers.html#x6	const x6		120
+nim	x7	dynasm/registers.html#x7	const x7		121
+nim	x8	dynasm/registers.html#x8	const x8		122
+nim	x9	dynasm/registers.html#x9	const x9		123
+nim	x10	dynasm/registers.html#x10	const x10		124
+nim	x11	dynasm/registers.html#x11	const x11		125
+nim	x12	dynasm/registers.html#x12	const x12		126
+nim	x13	dynasm/registers.html#x13	const x13		127
+nim	x14	dynasm/registers.html#x14	const x14		128
+nim	x15	dynasm/registers.html#x15	const x15		129
+nim	x16	dynasm/registers.html#x16	const x16		130
+nim	x17	dynasm/registers.html#x17	const x17		131
+nim	x18	dynasm/registers.html#x18	const x18		132
+nim	x19	dynasm/registers.html#x19	const x19		133
+nim	x20	dynasm/registers.html#x20	const x20		134
+nim	x21	dynasm/registers.html#x21	const x21		135
+nim	x22	dynasm/registers.html#x22	const x22		136
+nim	x23	dynasm/registers.html#x23	const x23		137
+nim	x24	dynasm/registers.html#x24	const x24		138
+nim	x25	dynasm/registers.html#x25	const x25		139
+nim	x26	dynasm/registers.html#x26	const x26		140
+nim	x27	dynasm/registers.html#x27	const x27		141
+nim	x28	dynasm/registers.html#x28	const x28		142
+nim	x29	dynasm/registers.html#x29	const x29		143
+nim	x30	dynasm/registers.html#x30	const x30		144
+nim	w0	dynasm/registers.html#w0	const w0		145
+nim	w1	dynasm/registers.html#w1	const w1		146
+nim	w2	dynasm/registers.html#w2	const w2		147
+nim	w3	dynasm/registers.html#w3	const w3		148
+nim	w4	dynasm/registers.html#w4	const w4		149
+nim	w5	dynasm/registers.html#w5	const w5		150
+nim	w6	dynasm/registers.html#w6	const w6		151
+nim	w7	dynasm/registers.html#w7	const w7		152
+nim	w8	dynasm/registers.html#w8	const w8		153
+nim	w9	dynasm/registers.html#w9	const w9		154
+nim	w10	dynasm/registers.html#w10	const w10		155
+nim	w11	dynasm/registers.html#w11	const w11		156
+nim	w12	dynasm/registers.html#w12	const w12		157
+nim	w13	dynasm/registers.html#w13	const w13		158
+nim	w14	dynasm/registers.html#w14	const w14		159
+nim	w15	dynasm/registers.html#w15	const w15		160
+nim	w16	dynasm/registers.html#w16	const w16		161
+nim	w17	dynasm/registers.html#w17	const w17		162
+nim	w18	dynasm/registers.html#w18	const w18		163
+nim	w19	dynasm/registers.html#w19	const w19		164
+nim	w20	dynasm/registers.html#w20	const w20		165
+nim	w21	dynasm/registers.html#w21	const w21		166
+nim	w22	dynasm/registers.html#w22	const w22		167
+nim	w23	dynasm/registers.html#w23	const w23		168
+nim	w24	dynasm/registers.html#w24	const w24		169
+nim	w25	dynasm/registers.html#w25	const w25		170
+nim	w26	dynasm/registers.html#w26	const w26		171
+nim	w27	dynasm/registers.html#w27	const w27		172
+nim	w28	dynasm/registers.html#w28	const w28		173
+nim	w29	dynasm/registers.html#w29	const w29		174
+nim	w30	dynasm/registers.html#w30	const w30		175
+nim	xzr	dynasm/registers.html#xzr	const xzr		176
+nim	wzr	dynasm/registers.html#wzr	const wzr		177
+nim	xsp	dynasm/registers.html#xsp	const xsp		178
+nim	wsp	dynasm/registers.html#wsp	const wsp		179
+nim	xmm0	dynasm/registers.html#xmm0	const xmm0		182
+nim	xmm1	dynasm/registers.html#xmm1	const xmm1		183
+nim	xmm2	dynasm/registers.html#xmm2	const xmm2		184
+nim	xmm3	dynasm/registers.html#xmm3	const xmm3		185
+nim	xmm4	dynasm/registers.html#xmm4	const xmm4		186
+nim	xmm5	dynasm/registers.html#xmm5	const xmm5		187
+nim	xmm6	dynasm/registers.html#xmm6	const xmm6		188
+nim	xmm7	dynasm/registers.html#xmm7	const xmm7		189
+nim	xmm8	dynasm/registers.html#xmm8	const xmm8		190
+nim	xmm9	dynasm/registers.html#xmm9	const xmm9		191
+nim	xmm10	dynasm/registers.html#xmm10	const xmm10		192
+nim	xmm11	dynasm/registers.html#xmm11	const xmm11		193
+nim	xmm12	dynasm/registers.html#xmm12	const xmm12		194
+nim	xmm13	dynasm/registers.html#xmm13	const xmm13		195
+nim	xmm14	dynasm/registers.html#xmm14	const xmm14		196
+nim	xmm15	dynasm/registers.html#xmm15	const xmm15		197
+nim	szNone	dynasm/registers.html#szNone	OpSize.szNone		204
+nim	sz8	dynasm/registers.html#sz8	OpSize.sz8		204
+nim	sz16	dynasm/registers.html#sz16	OpSize.sz16		204
+nim	sz32	dynasm/registers.html#sz32	OpSize.sz32		204
+nim	sz64	dynasm/registers.html#sz64	OpSize.sz64		204
+nim	OpSize	dynasm/registers.html#OpSize	enum OpSize		204
+nim	lrForward	dynasm/registers.html#lrForward	LabelRefKind.lrForward		211
+nim	lrBackward	dynasm/registers.html#lrBackward	LabelRefKind.lrBackward		211
+nim	lrGlobal	dynasm/registers.html#lrGlobal	LabelRefKind.lrGlobal		211
+nim	lrDynamic	dynasm/registers.html#lrDynamic	LabelRefKind.lrDynamic		211
+nim	lrAbsolute	dynasm/registers.html#lrAbsolute	LabelRefKind.lrAbsolute		211
+nim	LabelRefKind	dynasm/registers.html#LabelRefKind	enum LabelRefKind		211
+nim	LabelRef	dynasm/registers.html#LabelRef	object LabelRef		218
+nim	MemOp	dynasm/registers.html#MemOp	object MemOp		229
+nim	okReg	dynasm/registers.html#okReg	OperandKind.okReg		241
+nim	okImm	dynasm/registers.html#okImm	OperandKind.okImm		241
+nim	okMem	dynasm/registers.html#okMem	OperandKind.okMem		241
+nim	okLabelRef	dynasm/registers.html#okLabelRef	OperandKind.okLabelRef		241
+nim	OperandKind	dynasm/registers.html#OperandKind	enum OperandKind		241
+nim	Operand	dynasm/registers.html#Operand	object Operand		247
+nim	regOp	dynasm/registers.html#regOp,Register,OpSize	proc regOp(r: Register; s: OpSize = szNone): Operand		261
+nim	immOp	dynasm/registers.html#immOp,int64,OpSize	proc immOp(v: int64; s: OpSize = szNone): Operand		264
+nim	memOp	dynasm/registers.html#memOp,MemOp,OpSize	proc memOp(m: MemOp; s: OpSize = szNone): Operand		267
+nim	labelOp	dynasm/registers.html#labelOp,LabelRef	proc labelOp(l: LabelRef): Operand		270
+nim	A64ExtLsl	dynasm/registers.html#A64ExtLsl	const A64ExtLsl		276
+nim	A64ExtSxtx	dynasm/registers.html#A64ExtSxtx	const A64ExtSxtx		277
+nim	A64ExtSxtw	dynasm/registers.html#A64ExtSxtw	const A64ExtSxtw		278
+nim	A64ExtUxtx	dynasm/registers.html#A64ExtUxtx	const A64ExtUxtx		279
+nim	A64ExtUxtw	dynasm/registers.html#A64ExtUxtw	const A64ExtUxtw		280
+nim	fwd	dynasm/registers.html#fwd,string,int	proc fwd(name: string; off: int = 0): LabelRef		282
+nim	bwd	dynasm/registers.html#bwd,string,int	proc bwd(name: string; off: int = 0): LabelRef		284
+nim	glob	dynasm/registers.html#glob,string,int	proc glob(name: string; off: int = 0): LabelRef		286
+nim	dynLbl	dynasm/registers.html#dynLbl,int,int	proc dynLbl(id: int; off: int = 0): LabelRef		288
+nim	extAddr	dynasm/registers.html#extAddr,int,int	proc extAddr(a: int; off: int = 0): LabelRef		290
+nim	byte	dynasm/registers.html#byte,int64	proc byte(v: int64): Operand		296
+nim	word	dynasm/registers.html#word,int64	proc word(v: int64): Operand		297
+nim	dword	dynasm/registers.html#dword,int64	proc dword(v: int64): Operand		298
+nim	qword	dynasm/registers.html#qword,int64	proc qword(v: int64): Operand		299
+nim	dynLbl	dynasm/registers.html#dynLbl,DynamicLabel,int	proc dynLbl(id: DynamicLabel; off: int = 0): LabelRef		301
+nim	dyn	dynasm/registers.html#dyn,DynamicLabel,int	proc dyn(id: DynamicLabel; off: int = 0): LabelRef		304
+nim	dyn	dynasm/registers.html#dyn,int,int	proc dyn(id: int; off: int = 0): LabelRef		306
+nim	extAddrPtr	dynasm/registers.html#extAddrPtr,pointer,int	proc extAddrPtr(a: pointer; off: int = 0): LabelRef		308
+nim	byte	dynasm/registers.html#byte,Register	proc byte(r: Register): Operand		312
+nim	word	dynasm/registers.html#word,Register	proc word(r: Register): Operand		313
+nim	dword	dynasm/registers.html#dword,Register	proc dword(r: Register): Operand		314
+nim	qword	dynasm/registers.html#qword,Register	proc qword(r: Register): Operand		315
+nim	byte	dynasm/registers.html#byte,MemOp	proc byte(m: MemOp): Operand		317
+nim	word	dynasm/registers.html#word,MemOp	proc word(m: MemOp): Operand		318
+nim	dword	dynasm/registers.html#dword,MemOp	proc dword(m: MemOp): Operand		319
+nim	qword	dynasm/registers.html#qword,MemOp	proc qword(m: MemOp): Operand		320
+nimgrp	word	dynasm/registers.html#word-procs-all	proc		297
+nimgrp	qword	dynasm/registers.html#qword-procs-all	proc		299
+nimgrp	byte	dynasm/registers.html#byte-procs-all	proc		296
+nimgrp	dyn	dynasm/registers.html#dyn-procs-all	proc		304
+nimgrp	dynlbl	dynasm/registers.html#dynLbl-procs-all	proc		288
+nimgrp	dword	dynasm/registers.html#dword-procs-all	proc		298

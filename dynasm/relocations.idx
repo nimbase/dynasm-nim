@@ -1,0 +1,34 @@
+nimTitle	relocations	dynasm/relocations.html	module dynasm/relocations		0
+nim	rkRelative	dynasm/relocations.html#rkRelative	RelocationKind.rkRelative		5
+nim	rkAbsToRel	dynasm/relocations.html#rkAbsToRel	RelocationKind.rkAbsToRel		5
+nim	rkRelToAbs	dynasm/relocations.html#rkRelToAbs	RelocationKind.rkRelToAbs		5
+nim	rkAbsolute	dynasm/relocations.html#rkAbsolute	RelocationKind.rkAbsolute		5
+nim	RelocationKind	dynasm/relocations.html#RelocationKind	enum RelocationKind		5
+nim	rsByte	dynasm/relocations.html#rsByte	RelocationSize.rsByte		11
+nim	rsWord	dynasm/relocations.html#rsWord	RelocationSize.rsWord		11
+nim	rsDWord	dynasm/relocations.html#rsDWord	RelocationSize.rsDWord		11
+nim	rsQWord	dynasm/relocations.html#rsQWord	RelocationSize.rsQWord		11
+nim	RelocationSize	dynasm/relocations.html#RelocationSize	enum RelocationSize		11
+nim	SimpleRelocation	dynasm/relocations.html#SimpleRelocation	object SimpleRelocation		17
+nim	AarchB	dynasm/relocations.html#AarchB	const AarchB		26
+nim	AarchBCond	dynasm/relocations.html#AarchBCond	const AarchBCond		28
+nim	AarchAdr	dynasm/relocations.html#AarchAdr	const AarchAdr		30
+nim	AarchAdrp	dynasm/relocations.html#AarchAdrp	const AarchAdrp		32
+nim	AarchTbz	dynasm/relocations.html#AarchTbz	const AarchTbz		34
+nim	encodeAarchReloc	dynasm/relocations.html#encodeAarchReloc,int	proc encodeAarchReloc(id: int): uint8		37
+nim	EncByte	dynasm/relocations.html#EncByte	const EncByte		46
+nim	EncWord	dynasm/relocations.html#EncWord	const EncWord		47
+nim	EncDWord	dynasm/relocations.html#EncDWord	const EncDWord		48
+nim	EncQWord	dynasm/relocations.html#EncQWord	const EncQWord		49
+nim	relSize	dynasm/relocations.html#relSize,RelocationSize	proc relSize(s: RelocationSize): int		51
+nim	decodeKind	dynasm/relocations.html#decodeKind,uint8	proc decodeKind(code: uint8): RelocationKind		53
+nim	fromEncoding	dynasm/relocations.html#fromEncoding,uint8	proc fromEncoding(code: uint8): SimpleRelocation		60
+nim	fromSize	dynasm/relocations.html#fromSize,RelocationKind,RelocationSize	proc fromSize(kind: RelocationKind; size: RelocationSize): SimpleRelocation		83
+nim	encodeKind	dynasm/relocations.html#encodeKind,RelocationKind,RelocationSize	proc encodeKind(kind: RelocationKind; size: RelocationSize): uint8		86
+nim	fitsSigned	dynasm/relocations.html#fitsSigned,int64,int	proc fitsSigned(value: int64; bits: int): bool		96
+nim	relSize	dynasm/relocations.html#relSize,SimpleRelocation	proc relSize(r: SimpleRelocation): int		101
+nim	writeAarchValue	dynasm/relocations.html#writeAarchValue,int,openArray[byte],int64	proc writeAarchValue(id: int; buf: var openArray[byte]; value: int64): bool		122
+nim	readAarchValue	dynasm/relocations.html#readAarchValue,int,openArray[byte]	proc readAarchValue(id: int; buf: openArray[byte]): int64		154
+nim	writeValue	dynasm/relocations.html#writeValue,SimpleRelocation,openArray[byte],int64	proc writeValue(r: SimpleRelocation; buf: var openArray[byte]; value: int64): bool		181
+nim	readValue	dynasm/relocations.html#readValue,SimpleRelocation,openArray[byte]	proc readValue(r: SimpleRelocation; buf: openArray[byte]): int64		208
+nimgrp	relsize	dynasm/relocations.html#relSize-procs-all	proc		51

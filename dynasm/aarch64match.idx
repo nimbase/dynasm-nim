@@ -1,0 +1,8 @@
+nimTitle	aarch64match	dynasm/aarch64match.html	module dynasm/aarch64match		0
+nim	a64IsBareV	dynasm/aarch64match.html#a64IsBareV,string	proc a64IsBareV(name: string): bool		57
+nim	a64IsReg	dynasm/aarch64match.html#a64IsReg,string,Table[string,string]	proc a64IsReg(name: string; aliases: Table[string, string]): bool		73
+nim	a64RegInfoOf	dynasm/aarch64match.html#a64RegInfoOf,string,Table[string,string]	proc a64RegInfoOf(name: string; aliases: Table[string, string]): A64RegInfo		77
+nim	a64Emit	dynasm/aarch64match.html#a64Emit,string,A64Entry,seq[NimNode],seq[A64Arg],NimNode,Table[string,string],int,NimNode	proc a64Emit(mn: string; entry: A64Entry; args: seq[NimNode]; argInfo: seq[A64Arg];\n        ops: NimNode; aliases: Table[string, string]; condBits: int;\n        stmt: NimNode): NimNode		672
+nim	isA64Mn	dynasm/aarch64match.html#isA64Mn,string	proc isA64Mn(mn: string): bool		1025
+nim	a64CondBitsOf	dynasm/aarch64match.html#a64CondBitsOf,string	proc a64CondBitsOf(name: string): int		1028
+nim	a64ProcessInstruction	dynasm/aarch64match.html#a64ProcessInstruction,string,seq[NimNode],NimNode,Table[string,string],int,NimNode	proc a64ProcessInstruction(mn: string; args: seq[NimNode]; ops: NimNode;\n                      aliases: Table[string, string]; condBits: int;\n                      stmt: NimNode): NimNode		1033

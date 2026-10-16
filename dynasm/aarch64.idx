@@ -1,0 +1,40 @@
+nimTitle	aarch64	dynasm/aarch64.html	module dynasm/aarch64		0
+nim	badImm	dynasm/aarch64.html#badImm,string	proc badImm(msg: string): ref DynasmError		29
+nim	encodeFloatImm	dynasm/aarch64.html#encodeFloatImm,uint32	proc encodeFloatImm(bits: uint32): int		32
+nim	encodeStretchedImm	dynasm/aarch64.html#encodeStretchedImm,uint64	proc encodeStretchedImm(value: uint64): int		43
+nim	encodeWide64	dynasm/aarch64.html#encodeWide64,uint64	proc encodeWide64(value: uint64): int		62
+nim	encodeWide32	dynasm/aarch64.html#encodeWide32,uint32	proc encodeWide32(value: uint32): int		72
+nim	encodeLogical32	dynasm/aarch64.html#encodeLogical32,uint32	proc encodeLogical32(value: uint32): int		80
+nim	encodeLogical64	dynasm/aarch64.html#encodeLogical64,uint64	proc encodeLogical64(value: uint64): int		101
+nim	a64Reloc	dynasm/aarch64.html#a64Reloc,auto,LabelRef,int	proc a64Reloc(a: var auto; lr: LabelRef; rel: int)		128
+nim	a64RRR	dynasm/aarch64.html#a64RRR,auto,uint32,Register,Register,Register	proc a64RRR(a: var auto; base: uint32; rd, rn, rm: Register)		145
+nim	a64RR	dynasm/aarch64.html#a64RR,auto,uint32,Register,Register	proc a64RR(a: var auto; base: uint32; rd, rm: Register)		149
+nim	a64RRn	dynasm/aarch64.html#a64RRn,auto,uint32,Register,Register	proc a64RRn(a: var auto; base: uint32; rd, rn: Register)		153
+nim	a64XRR	dynasm/aarch64.html#a64XRR,auto,uint32,Register,Register	proc a64XRR(a: var auto; base: uint32; rn, rm: Register)		157
+nim	a64RRRR	dynasm/aarch64.html#a64RRRR,auto,uint32,Register,Register,Register,Register	proc a64RRRR(a: var auto; base: uint32; rd, rn, rm, ra: Register)		161
+nim	a64RRI12	dynasm/aarch64.html#a64RRI12,auto,uint32,Register,Register,int64,int64	proc a64RRI12(a: var auto; base: uint32; rd, rn: Register; imm: int64; shift: int64)		170
+nim	a64RRSh	dynasm/aarch64.html#a64RRSh,auto,uint32,Register,Register,Register,int64,int64,bool	proc a64RRSh(a: var auto; base: uint32; rd, rn, rm: Register; shift, amt: int64;\n        is64: bool)		182
+nim	a64LogicI	dynasm/aarch64.html#a64LogicI,auto,uint32,Register,Register,uint64,bool	proc a64LogicI(a: var auto; base: uint32; rd, rn: Register; imm: uint64; is64: bool)		195
+nim	a64MovI	dynasm/aarch64.html#a64MovI,auto,Register,uint64,bool	proc a64MovI(a: var auto; rd: Register; imm: uint64; is64: bool)		206
+nim	a64MovInv	dynasm/aarch64.html#a64MovInv,auto,Register,uint64,bool	proc a64MovInv(a: var auto; rd: Register; imm: uint64; is64: bool)		219
+nim	a64MovLogic	dynasm/aarch64.html#a64MovLogic,auto,Register,uint64,bool	proc a64MovLogic(a: var auto; rd: Register; imm: uint64; is64: bool)		230
+nim	a64MovWide	dynasm/aarch64.html#a64MovWide,auto,uint32,Register,uint64,int64,bool	proc a64MovWide(a: var auto; base: uint32; rd: Register; imm16: uint64;\n           shiftAmt: int64; is64: bool)		237
+nim	a64FmovI	dynasm/aarch64.html#a64FmovI,auto,uint32,Register,uint32	proc a64FmovI(a: var auto; base: uint32; rd: Register; bits: uint32)		254
+nim	a64Fcmp0	dynasm/aarch64.html#a64Fcmp0,auto,uint32,Register	proc a64Fcmp0(a: var auto; base: uint32; rn: Register)		262
+nim	a64VecRRR	dynasm/aarch64.html#a64VecRRR,auto,uint32,Register,Register,Register,bool	proc a64VecRRR(a: var auto; base: uint32; rd, rn, rm: Register; is128: bool)		266
+nim	a64VecRR	dynasm/aarch64.html#a64VecRR,auto,uint32,Register,Register,bool	proc a64VecRR(a: var auto; base: uint32; rd, rn: Register; is128: bool)		274
+nim	a64Movi	dynasm/aarch64.html#a64Movi,auto,uint32,Register,uint64,int64,bool,bool	proc a64Movi(a: var auto; base: uint32; rd: Register; imm: uint64; shift: int64;\n        isH: bool; is128: bool)		282
+nim	a64MoviD	dynasm/aarch64.html#a64MoviD,auto,uint32,Register,uint64,bool	proc a64MoviD(a: var auto; base: uint32; rd: Register; imm: uint64; is128: bool)		301
+nim	a64DupG	dynasm/aarch64.html#a64DupG,auto,uint32,Register,Register,bool	proc a64DupG(a: var auto; base: uint32; rd, rn: Register; is128: bool)		314
+nim	a64BfmI	dynasm/aarch64.html#a64BfmI,auto,uint32,Register,Register,int64,bool,int	proc a64BfmI(a: var auto; base: uint32; rd, rn: Register; amt: int64; is64: bool;\n        op: int)		325
+nim	a64MemU	dynasm/aarch64.html#a64MemU,auto,uint32,Register,Register,int64,int	proc a64MemU(a: var auto; base: uint32; rt, rn: Register; off: int64; scale: int)		351
+nim	a64Mem9	dynasm/aarch64.html#a64Mem9,auto,uint32,Register,Register,int64	proc a64Mem9(a: var auto; base: uint32; rt, rn: Register; off: int64)		361
+nim	a64Pair	dynasm/aarch64.html#a64Pair,auto,uint32,Register,Register,Register,int64,int	proc a64Pair(a: var auto; base: uint32; rt1, rt2, rn: Register; off: int64;\n        scale: int)		368
+nim	a64MemX	dynasm/aarch64.html#a64MemX,auto,uint32,Register,Register,Register,int64,int64,int	proc a64MemX(a: var auto; base: uint32; rt, rn, rm: Register; ext, amt: int64;\n        scale: int)		378
+nim	a64BrLbl	dynasm/aarch64.html#a64BrLbl,auto,uint32,LabelRef,int	proc a64BrLbl(a: var auto; base: uint32; lr: LabelRef; rel: int)		400
+nim	a64Cbx	dynasm/aarch64.html#a64Cbx,auto,uint32,Register,LabelRef	proc a64Cbx(a: var auto; base: uint32; rt: Register; lr: LabelRef)		405
+nim	a64Tbx	dynasm/aarch64.html#a64Tbx,auto,uint32,Register,int64,LabelRef,bool	proc a64Tbx(a: var auto; base: uint32; rt: Register; bit: int64; lr: LabelRef;\n       is64: bool)		410
+nim	a64Adr	dynasm/aarch64.html#a64Adr,auto,uint32,Register,LabelRef,bool	proc a64Adr(a: var auto; base: uint32; rd: Register; lr: LabelRef; isAdrp: bool)		422
+nim	a64BrReg	dynasm/aarch64.html#a64BrReg,auto,uint32,Register	proc a64BrReg(a: var auto; base: uint32; rn: Register)		427
+nim	a64Misc	dynasm/aarch64.html#a64Misc,auto,uint32	proc a64Misc(a: var auto; base: uint32)		431
+nim	a64Hlt	dynasm/aarch64.html#a64Hlt,auto,uint32,int64	proc a64Hlt(a: var auto; base: uint32; imm: int64)		434

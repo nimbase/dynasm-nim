@@ -1,0 +1,41 @@
+nimTitle	encoder	dynasm/encoder.html	module dynasm/encoder		0
+nim	emitRexIfNeeded	dynasm/encoder.html#emitRexIfNeeded.t,untyped,bool,bool,bool,bool,bool	template emitRexIfNeeded(a: untyped; w, r, x, b: bool; extraForce: bool = false)		8
+nim	encNop	dynasm/encoder.html#encNop,auto	proc encNop(a: var auto)		138
+nim	encRet	dynasm/encoder.html#encRet,auto	proc encRet(a: var auto)		141
+nim	encInt3	dynasm/encoder.html#encInt3,auto	proc encInt3(a: var auto)		144
+nim	encPushReg	dynasm/encoder.html#encPushReg,auto,Register,bool	proc encPushReg(a: var auto; reg: Register; isX64: bool)		147
+nim	encPopReg	dynasm/encoder.html#encPopReg,auto,Register,bool	proc encPopReg(a: var auto; reg: Register; isX64: bool)		155
+nim	encMovRegReg	dynasm/encoder.html#encMovRegReg,auto,Register,Register,OpSize	proc encMovRegReg(a: var auto; dst, src: Register; size: OpSize)		161
+nim	encMovRegImm	dynasm/encoder.html#encMovRegImm,auto,Register,int64,OpSize	proc encMovRegImm(a: var auto; dst: Register; imm: int64; size: OpSize)		170
+nim	encMovRegMem	dynasm/encoder.html#encMovRegMem,auto,Register,MemOp,OpSize,bool	proc encMovRegMem(a: var auto; dst: Register; mem: MemOp; size: OpSize; isX64: bool)		197
+nim	encMovMemReg	dynasm/encoder.html#encMovMemReg,auto,MemOp,Register,OpSize,bool	proc encMovMemReg(a: var auto; mem: MemOp; src: Register; size: OpSize; isX64: bool)		210
+nim	encMovMemImm	dynasm/encoder.html#encMovMemImm,auto,MemOp,int64,OpSize,bool	proc encMovMemImm(a: var auto; mem: MemOp; imm: int64; size: OpSize; isX64: bool)		223
+nim	encLeaSized	dynasm/encoder.html#encLeaSized,auto,Register,OpSize,MemOp,bool	proc encLeaSized(a: var auto; dst: Register; dstSize: OpSize; mem: MemOp; isX64: bool)		252
+nim	encAluRegReg	dynasm/encoder.html#encAluRegReg,auto,string,Register,Register,OpSize	proc encAluRegReg(a: var auto; mn: string; dst, src: Register; size: OpSize)		273
+nim	encAluRegImm	dynasm/encoder.html#encAluRegImm,auto,string,Register,int64,OpSize	proc encAluRegImm(a: var auto; mn: string; dst: Register; imm: int64; size: OpSize)		286
+nim	encAluMemReg	dynasm/encoder.html#encAluMemReg,auto,string,MemOp,Register,OpSize,bool	proc encAluMemReg(a: var auto; mn: string; mem: MemOp; src: Register; size: OpSize;\n             isX64: bool)		316
+nim	encAluRegMem	dynasm/encoder.html#encAluRegMem,auto,string,Register,MemOp,OpSize,bool	proc encAluRegMem(a: var auto; mn: string; dst: Register; mem: MemOp; size: OpSize;\n             isX64: bool)		330
+nim	encAluMemImm	dynasm/encoder.html#encAluMemImm,auto,string,MemOp,int64,OpSize,bool	proc encAluMemImm(a: var auto; mn: string; mem: MemOp; imm: int64; size: OpSize;\n             isX64: bool)		344
+nim	encIncDec	dynasm/encoder.html#encIncDec,auto,string,Register,OpSize	proc encIncDec(a: var auto; mn: string; reg: Register; size: OpSize)		372
+nim	encIncDecMem	dynasm/encoder.html#encIncDecMem,auto,string,MemOp,OpSize,bool	proc encIncDecMem(a: var auto; mn: string; mem: MemOp; size: OpSize; isX64: bool)		386
+nim	encTestRegReg	dynasm/encoder.html#encTestRegReg,auto,Register,Register,OpSize	proc encTestRegReg(a: var auto; lhs, rhs: Register; size: OpSize)		403
+nim	encJmpRel	dynasm/encoder.html#encJmpRel,auto,LabelRef	proc encJmpRel(a: var auto; lr: LabelRef)		415
+nim	encJmpShort	dynasm/encoder.html#encJmpShort,auto,LabelRef	proc encJmpShort(a: var auto; lr: LabelRef)		427
+nim	encJmpReg	dynasm/encoder.html#encJmpReg,auto,Register	proc encJmpReg(a: var auto; reg: Register)		439
+nim	encJmpMem	dynasm/encoder.html#encJmpMem,auto,MemOp,bool	proc encJmpMem(a: var auto; mem: MemOp; isX64: bool)		445
+nim	encJcc	dynasm/encoder.html#encJcc,auto,string,LabelRef	proc encJcc(a: var auto; mn: string; lr: LabelRef)		474
+nim	encJccShort	dynasm/encoder.html#encJccShort,auto,string,LabelRef	proc encJccShort(a: var auto; mn: string; lr: LabelRef)		488
+nim	encCallRel	dynasm/encoder.html#encCallRel,auto,LabelRef	proc encCallRel(a: var auto; lr: LabelRef)		501
+nim	encCallReg	dynasm/encoder.html#encCallReg,auto,Register	proc encCallReg(a: var auto; reg: Register)		513
+nim	encCallMem	dynasm/encoder.html#encCallMem,auto,MemOp,bool	proc encCallMem(a: var auto; mem: MemOp; isX64: bool)		519
+nim	encShiftRegImm	dynasm/encoder.html#encShiftRegImm,auto,string,Register,int64,OpSize	proc encShiftRegImm(a: var auto; mn: string; reg: Register; count: int64;\n               size: OpSize)		540
+nim	encShiftMemImm	dynasm/encoder.html#encShiftMemImm,auto,string,MemOp,int64,OpSize,bool	proc encShiftMemImm(a: var auto; mn: string; mem: MemOp; count: int64; size: OpSize;\n               isX64: bool)		558
+nim	encShiftRegCl	dynasm/encoder.html#encShiftRegCl,auto,string,Register,OpSize	proc encShiftRegCl(a: var auto; mn: string; reg: Register; size: OpSize)		575
+nim	encImulRegReg	dynasm/encoder.html#encImulRegReg,auto,Register,Register,OpSize	proc encImulRegReg(a: var auto; dst, src: Register; size: OpSize)		595
+nim	encImulRegMem	dynasm/encoder.html#encImulRegMem,auto,Register,MemOp,OpSize,bool	proc encImulRegMem(a: var auto; dst: Register; mem: MemOp; size: OpSize; isX64: bool)		607
+nim	encImulRegImm	dynasm/encoder.html#encImulRegImm,auto,Register,Register,int64,OpSize	proc encImulRegImm(a: var auto; dst, src: Register; imm: int64; size: OpSize)		618
+nim	encDivReg	dynasm/encoder.html#encDivReg,auto,string,Register,OpSize	proc encDivReg(a: var auto; mn: string; reg: Register; size: OpSize)		649
+nim	encDivMem	dynasm/encoder.html#encDivMem,auto,string,MemOp,OpSize,bool	proc encDivMem(a: var auto; mn: string; mem: MemOp; size: OpSize; isX64: bool)		664
+nim	encCqo	dynasm/encoder.html#encCqo,auto,OpSize	proc encCqo(a: var auto; size: OpSize)		679
+nim	encMovzxRegReg	dynasm/encoder.html#encMovzxRegReg,auto,Register,Register,OpSize,OpSize	proc encMovzxRegReg(a: var auto; dst, src: Register; srcSize: OpSize; dstSize: OpSize)		693
+nim	encMovzxRegMem	dynasm/encoder.html#encMovzxRegMem,auto,Register,MemOp,OpSize,OpSize,bool	proc encMovzxRegMem(a: var auto; dst: Register; mem: MemOp; srcSize: OpSize;\n               dstSize: OpSize; isX64: bool)		713

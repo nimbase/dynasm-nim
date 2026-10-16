@@ -1,0 +1,99 @@
+nimTitle	assembler	dynasm/assembler.html	module dynasm/assembler		0
+nim	PatchLoc	dynasm/assembler.html#PatchLoc	object PatchLoc		16
+nim	newPatchLoc	dynasm/assembler.html#newPatchLoc,int,int,int,int,SimpleRelocation	proc newPatchLoc(location, targetOffset, fieldOffset, refOffset: int;\n            r: SimpleRelocation): PatchLoc		23
+nim	fieldStart	dynasm/assembler.html#fieldStart,PatchLoc,int	proc fieldStart(loc: PatchLoc; bufOffset: int): int		28
+nim	patchRange	dynasm/assembler.html#patchRange,PatchLoc,int	proc patchRange(loc: PatchLoc; bufOffset: int): tuple[start, len: int]		31
+nim	relocValue	dynasm/assembler.html#relocValue,PatchLoc,int,int	proc relocValue(loc: PatchLoc; target, bufAddr: int): int64		34
+nim	patchAt	dynasm/assembler.html#patchAt,PatchLoc,openArray[byte],int,int,int	proc patchAt(loc: PatchLoc; buf: var openArray[byte]; bufOffset: int;\n        bufAddr, target: int)		47
+nim	adjustAt	dynasm/assembler.html#adjustAt,PatchLoc,openArray[byte],int,int	proc adjustAt(loc: PatchLoc; buf: var openArray[byte]; bufOffset: int;\n         adjustment: int)		61
+nim	needsAdjustment	dynasm/assembler.html#needsAdjustment,PatchLoc	proc needsAdjustment(loc: PatchLoc): bool		81
+nim	SimpleAssembler	dynasm/assembler.html#SimpleAssembler	object SimpleAssembler		89
+nim	initSimpleAssembler	dynasm/assembler.html#initSimpleAssembler	proc initSimpleAssembler(): SimpleAssembler		92
+nim	offset	dynasm/assembler.html#offset,SimpleAssembler	proc offset(a: SimpleAssembler): AssemblyOffset		94
+nim	push	dynasm/assembler.html#push,SimpleAssembler,byte	proc push(a: var SimpleAssembler; b: byte)		97
+nim	pushI8	dynasm/assembler.html#pushI8,SimpleAssembler,int8	proc pushI8(a: var SimpleAssembler; v: int8)		98
+nim	pushI16	dynasm/assembler.html#pushI16,SimpleAssembler,int16	proc pushI16(a: var SimpleAssembler; v: int16)		99
+nim	pushI32	dynasm/assembler.html#pushI32,SimpleAssembler,int32	proc pushI32(a: var SimpleAssembler; v: int32)		102
+nim	pushI64	dynasm/assembler.html#pushI64,SimpleAssembler,int64	proc pushI64(a: var SimpleAssembler; v: int64)		105
+nim	pushU16	dynasm/assembler.html#pushU16,SimpleAssembler,uint16	proc pushU16(a: var SimpleAssembler; v: uint16)		108
+nim	pushU32	dynasm/assembler.html#pushU32,SimpleAssembler,uint32	proc pushU32(a: var SimpleAssembler; v: uint32)		110
+nim	pushU64	dynasm/assembler.html#pushU64,SimpleAssembler,uint64	proc pushU64(a: var SimpleAssembler; v: uint64)		112
+nim	align	dynasm/assembler.html#align,SimpleAssembler,int,byte	proc align(a: var SimpleAssembler; alignment: int; with: byte = 0x00000090)		115
+nim	extendBytes	dynasm/assembler.html#extendBytes,SimpleAssembler,openArray[byte]	proc extendBytes(a: var SimpleAssembler; data: openArray[byte])		121
+nim	finalize	dynasm/assembler.html#finalize,SimpleAssembler	proc finalize(a: SimpleAssembler): seq[byte]		124
+nim	VecAssembler	dynasm/assembler.html#VecAssembler	object VecAssembler		131
+nim	initVecAssembler	dynasm/assembler.html#initVecAssembler,int	proc initVecAssembler(baseAddr: int = 0): VecAssembler		139
+nim	offset	dynasm/assembler.html#offset,VecAssembler	proc offset(a: VecAssembler): AssemblyOffset		143
+nim	push	dynasm/assembler.html#push,VecAssembler,byte	proc push(a: var VecAssembler; b: byte)		146
+nim	pushI8	dynasm/assembler.html#pushI8,VecAssembler,int8	proc pushI8(a: var VecAssembler; v: int8)		147
+nim	pushI16	dynasm/assembler.html#pushI16,VecAssembler,int16	proc pushI16(a: var VecAssembler; v: int16)		148
+nim	pushI32	dynasm/assembler.html#pushI32,VecAssembler,int32	proc pushI32(a: var VecAssembler; v: int32)		151
+nim	pushI64	dynasm/assembler.html#pushI64,VecAssembler,int64	proc pushI64(a: var VecAssembler; v: int64)		154
+nim	pushU16	dynasm/assembler.html#pushU16,VecAssembler,uint16	proc pushU16(a: var VecAssembler; v: uint16)		157
+nim	pushU32	dynasm/assembler.html#pushU32,VecAssembler,uint32	proc pushU32(a: var VecAssembler; v: uint32)		159
+nim	pushU64	dynasm/assembler.html#pushU64,VecAssembler,uint64	proc pushU64(a: var VecAssembler; v: uint64)		161
+nim	align	dynasm/assembler.html#align,VecAssembler,int,byte	proc align(a: var VecAssembler; alignment: int; with: byte = 0x00000090)		164
+nim	extendBytes	dynasm/assembler.html#extendBytes,VecAssembler,openArray[byte]	proc extendBytes(a: var VecAssembler; data: openArray[byte])		170
+nim	newDynamicLabel	dynasm/assembler.html#newDynamicLabel,VecAssembler	proc newDynamicLabel(a: var VecAssembler): DynamicLabel		173
+nim	localLabel	dynasm/assembler.html#localLabel,VecAssembler,string	proc localLabel(a: var VecAssembler; name: string)		176
+nim	globalLabel	dynasm/assembler.html#globalLabel,VecAssembler,string	proc globalLabel(a: var VecAssembler; name: string)		179
+nim	dynamicLabel	dynasm/assembler.html#dynamicLabel,VecAssembler,DynamicLabel	proc dynamicLabel(a: var VecAssembler; id: DynamicLabel)		185
+nim	forwardReloc	dynasm/assembler.html#forwardReloc,VecAssembler,string,int,int,int,uint8	proc forwardReloc(a: var VecAssembler; name: string; targetOffset: int;\n             fieldOffset, refOffset: int; enc: uint8)		191
+nim	backwardReloc	dynasm/assembler.html#backwardReloc,VecAssembler,string,int,int,int,uint8	proc backwardReloc(a: var VecAssembler; name: string; targetOffset: int;\n              fieldOffset, refOffset: int; enc: uint8)		202
+nim	globalReloc	dynasm/assembler.html#globalReloc,VecAssembler,string,int,int,int,uint8	proc globalReloc(a: var VecAssembler; name: string; targetOffset: int;\n            fieldOffset, refOffset: int; enc: uint8)		213
+nim	dynamicReloc	dynasm/assembler.html#dynamicReloc,VecAssembler,DynamicLabel,int,int,int,uint8	proc dynamicReloc(a: var VecAssembler; id: DynamicLabel; targetOffset: int;\n             fieldOffset, refOffset: int; enc: uint8)		220
+nim	valueReloc	dynasm/assembler.html#valueReloc,VecAssembler,int,int,int,uint8	proc valueReloc(a: var VecAssembler; value: int; fieldOffset, refOffset: int;\n           enc: uint8)		227
+nim	commit	dynasm/assembler.html#commit,VecAssembler	proc commit(a: var VecAssembler)		239
+nim	finalize	dynasm/assembler.html#finalize,VecAssembler	proc finalize(a: var VecAssembler): seq[byte]		265
+nim	Assembler	dynasm/assembler.html#Assembler	object Assembler		274
+nim	execAddr	dynasm/assembler.html#execAddr,Assembler	proc execAddr(a: Assembler): int		285
+nim	initAssembler	dynasm/assembler.html#initAssembler,ArchKind,int	proc initAssembler(arch: ArchKind = akX64; initialSize: int = DefaultPageSize): Assembler		288
+nim	newAssembler	dynasm/assembler.html#newAssembler,ArchKind	proc newAssembler(arch: ArchKind = akX64): Assembler		299
+nim	offset	dynasm/assembler.html#offset,Assembler	proc offset(a: Assembler): AssemblyOffset		302
+nim	push	dynasm/assembler.html#push,Assembler,byte	proc push(a: var Assembler; b: byte)		305
+nim	pushI8	dynasm/assembler.html#pushI8,Assembler,int8	proc pushI8(a: var Assembler; v: int8)		306
+nim	pushI16	dynasm/assembler.html#pushI16,Assembler,int16	proc pushI16(a: var Assembler; v: int16)		307
+nim	pushI32	dynasm/assembler.html#pushI32,Assembler,int32	proc pushI32(a: var Assembler; v: int32)		310
+nim	pushI64	dynasm/assembler.html#pushI64,Assembler,int64	proc pushI64(a: var Assembler; v: int64)		313
+nim	pushU16	dynasm/assembler.html#pushU16,Assembler,uint16	proc pushU16(a: var Assembler; v: uint16)		316
+nim	pushU32	dynasm/assembler.html#pushU32,Assembler,uint32	proc pushU32(a: var Assembler; v: uint32)		318
+nim	pushU64	dynasm/assembler.html#pushU64,Assembler,uint64	proc pushU64(a: var Assembler; v: uint64)		320
+nim	align	dynasm/assembler.html#align,Assembler,int,byte	proc align(a: var Assembler; alignment: int; with: byte = 0x00000090)		323
+nim	extendBytes	dynasm/assembler.html#extendBytes,Assembler,openArray[byte]	proc extendBytes(a: var Assembler; data: openArray[byte])		330
+nim	newDynamicLabel	dynasm/assembler.html#newDynamicLabel,Assembler	proc newDynamicLabel(a: var Assembler): DynamicLabel		333
+nim	localLabel	dynasm/assembler.html#localLabel,Assembler,string	proc localLabel(a: var Assembler; name: string)		336
+nim	globalLabel	dynasm/assembler.html#globalLabel,Assembler,string	proc globalLabel(a: var Assembler; name: string)		339
+nim	dynamicLabel	dynasm/assembler.html#dynamicLabel,Assembler,DynamicLabel	proc dynamicLabel(a: var Assembler; id: DynamicLabel)		345
+nim	forwardReloc	dynasm/assembler.html#forwardReloc,Assembler,string,int,int,int,uint8	proc forwardReloc(a: var Assembler; name: string; targetOffset: int;\n             fieldOffset, refOffset: int; enc: uint8)		351
+nim	backwardReloc	dynasm/assembler.html#backwardReloc,Assembler,string,int,int,int,uint8	proc backwardReloc(a: var Assembler; name: string; targetOffset: int;\n              fieldOffset, refOffset: int; enc: uint8)		362
+nim	globalReloc	dynasm/assembler.html#globalReloc,Assembler,string,int,int,int,uint8	proc globalReloc(a: var Assembler; name: string; targetOffset: int;\n            fieldOffset, refOffset: int; enc: uint8)		373
+nim	dynamicReloc	dynasm/assembler.html#dynamicReloc,Assembler,DynamicLabel,int,int,int,uint8	proc dynamicReloc(a: var Assembler; id: DynamicLabel; targetOffset: int;\n             fieldOffset, refOffset: int; enc: uint8)		380
+nim	valueReloc	dynasm/assembler.html#valueReloc,Assembler,int,int,int,uint8	proc valueReloc(a: var Assembler; value: int; fieldOffset, refOffset: int; enc: uint8)		387
+nim	encodeRelocs	dynasm/assembler.html#encodeRelocs,Assembler	proc encodeRelocs(a: var Assembler)		401
+nim	ensureExecCapacity	dynasm/assembler.html#ensureExecCapacity,Assembler,int	proc ensureExecCapacity(a: var Assembler; need: int)		429
+nim	commit	dynasm/assembler.html#commit,Assembler	proc commit(a: var Assembler)		461
+nim	finalize	dynasm/assembler.html#finalize,Assembler	proc finalize(a: var Assembler): ExecutableBuffer		482
+nim	readerPtr	dynasm/assembler.html#readerPtr,Assembler,AssemblyOffset	proc readerPtr(a: Assembler; off: AssemblyOffset): pointer		488
+nim	committedBytes	dynasm/assembler.html#committedBytes,Assembler	proc committedBytes(a: Assembler): seq[byte]		492
+nimgrp	push	dynasm/assembler.html#push-procs-all	proc		97
+nimgrp	backwardreloc	dynasm/assembler.html#backwardReloc-procs-all	proc		202
+nimgrp	pushi32	dynasm/assembler.html#pushI32-procs-all	proc		102
+nimgrp	pushu64	dynasm/assembler.html#pushU64-procs-all	proc		112
+nimgrp	finalize	dynasm/assembler.html#finalize-procs-all	proc		124
+nimgrp	forwardreloc	dynasm/assembler.html#forwardReloc-procs-all	proc		191
+nimgrp	locallabel	dynasm/assembler.html#localLabel-procs-all	proc		176
+nimgrp	pushi16	dynasm/assembler.html#pushI16-procs-all	proc		99
+nimgrp	offset	dynasm/assembler.html#offset-procs-all	proc		94
+nimgrp	dynamiclabel	dynasm/assembler.html#dynamicLabel-procs-all	proc		185
+nimgrp	dynamicreloc	dynasm/assembler.html#dynamicReloc-procs-all	proc		220
+nimgrp	valuereloc	dynasm/assembler.html#valueReloc-procs-all	proc		227
+nimgrp	pushu32	dynasm/assembler.html#pushU32-procs-all	proc		110
+nimgrp	newdynamiclabel	dynasm/assembler.html#newDynamicLabel-procs-all	proc		173
+nimgrp	pushi8	dynasm/assembler.html#pushI8-procs-all	proc		98
+nimgrp	pushi64	dynasm/assembler.html#pushI64-procs-all	proc		105
+nimgrp	align	dynasm/assembler.html#align-procs-all	proc		115
+nimgrp	globalreloc	dynasm/assembler.html#globalReloc-procs-all	proc		213
+nimgrp	commit	dynasm/assembler.html#commit-procs-all	proc		239
+nimgrp	extendbytes	dynasm/assembler.html#extendBytes-procs-all	proc		121
+nimgrp	pushu16	dynasm/assembler.html#pushU16-procs-all	proc		108
+nimgrp	globallabel	dynasm/assembler.html#globalLabel-procs-all	proc		179

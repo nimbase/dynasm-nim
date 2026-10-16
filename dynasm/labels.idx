@@ -1,0 +1,19 @@
+nimTitle	labels	dynasm/labels.html	module dynasm/labels		0
+nim	StaticLabel	dynasm/labels.html#StaticLabel	object StaticLabel		8
+nim	isGlobal	dynasm/labels.html#isGlobal,StaticLabel	proc isGlobal(l: StaticLabel): bool		12
+nim	isLocal	dynasm/labels.html#isLocal,StaticLabel	proc isLocal(l: StaticLabel): bool		13
+nim	globalLabel	dynasm/labels.html#globalLabel,string	proc globalLabel(name: string): StaticLabel		15
+nim	localLabel	dynasm/labels.html#localLabel,string,int	proc localLabel(name: string; version: int): StaticLabel		18
+nim	firstLocal	dynasm/labels.html#firstLocal,string	proc firstLocal(name: string): StaticLabel		21
+nim	nextLocal	dynasm/labels.html#nextLocal,StaticLabel	proc nextLocal(l: StaticLabel): StaticLabel		24
+nim	getName	dynasm/labels.html#getName,StaticLabel	proc getName(l: StaticLabel): string		28
+nim	LabelRegistry	dynasm/labels.html#LabelRegistry	object LabelRegistry		31
+nim	initLabelRegistry	dynasm/labels.html#initLabelRegistry	proc initLabelRegistry(): LabelRegistry		36
+nim	clear	dynasm/labels.html#clear,LabelRegistry	proc clear(r: var LabelRegistry)		43
+nim	newDynamicLabel	dynasm/labels.html#newDynamicLabel,LabelRegistry	proc newDynamicLabel(r: var LabelRegistry): DynamicLabel		48
+nim	defineDynamic	dynasm/labels.html#defineDynamic,LabelRegistry,DynamicLabel,AssemblyOffset	proc defineDynamic(r: var LabelRegistry; id: DynamicLabel; off: AssemblyOffset)		53
+nim	defineGlobal	dynasm/labels.html#defineGlobal,LabelRegistry,string,AssemblyOffset	proc defineGlobal(r: var LabelRegistry; name: string; off: AssemblyOffset)		62
+nim	defineLocal	dynasm/labels.html#defineLocal,LabelRegistry,string,AssemblyOffset	proc defineLocal(r: var LabelRegistry; name: string; off: AssemblyOffset)		68
+nim	placeLocalReference	dynasm/labels.html#placeLocalReference,LabelRegistry,string	proc placeLocalReference(r: LabelRegistry; name: string): tuple[found: bool,\n    label: StaticLabel]		75
+nim	resolveDynamic	dynasm/labels.html#resolveDynamic,LabelRegistry,DynamicLabel	proc resolveDynamic(r: LabelRegistry; id: DynamicLabel): AssemblyOffset		83
+nim	resolveStatic	dynasm/labels.html#resolveStatic,LabelRegistry,StaticLabel	proc resolveStatic(r: LabelRegistry; label: StaticLabel): AssemblyOffset		89

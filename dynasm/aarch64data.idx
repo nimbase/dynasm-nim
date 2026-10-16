@@ -1,0 +1,63 @@
+nimTitle	aarch64data	dynasm/aarch64data.html	module dynasm/aarch64data		0
+nim	asX	dynasm/aarch64data.html#asX	A64Shape.asX		11
+nim	asW	dynasm/aarch64data.html#asW	A64Shape.asW		11
+nim	asXSP	dynasm/aarch64data.html#asXSP	A64Shape.asXSP		11
+nim	asWSP	dynasm/aarch64data.html#asWSP	A64Shape.asWSP		11
+nim	asB	dynasm/aarch64data.html#asB	A64Shape.asB		11
+nim	asH	dynasm/aarch64data.html#asH	A64Shape.asH		11
+nim	asS	dynasm/aarch64data.html#asS	A64Shape.asS		11
+nim	asD	dynasm/aarch64data.html#asD	A64Shape.asD		11
+nim	asQ	dynasm/aarch64data.html#asQ	A64Shape.asQ		11
+nim	asVeB	dynasm/aarch64data.html#asVeB	A64Shape.asVeB		11
+nim	asVeH	dynasm/aarch64data.html#asVeH	A64Shape.asVeH		11
+nim	asVeS	dynasm/aarch64data.html#asVeS	A64Shape.asVeS		11
+nim	asVeD	dynasm/aarch64data.html#asVeD	A64Shape.asVeD		11
+nim	asImm	dynasm/aarch64data.html#asImm	A64Shape.asImm		11
+nim	asFImm	dynasm/aarch64data.html#asFImm	A64Shape.asFImm		11
+nim	asFZero	dynasm/aarch64data.html#asFZero	A64Shape.asFZero		11
+nim	asMemBase	dynasm/aarch64data.html#asMemBase	A64Shape.asMemBase		11
+nim	asMemOff	dynasm/aarch64data.html#asMemOff	A64Shape.asMemOff		11
+nim	asMemPre	dynasm/aarch64data.html#asMemPre	A64Shape.asMemPre		11
+nim	asMemPost	dynasm/aarch64data.html#asMemPost	A64Shape.asMemPost		11
+nim	asMemIdx	dynasm/aarch64data.html#asMemIdx	A64Shape.asMemIdx		11
+nim	asLbl	dynasm/aarch64data.html#asLbl	A64Shape.asLbl		11
+nim	asMod	dynasm/aarch64data.html#asMod	A64Shape.asMod		11
+nim	asPre	dynasm/aarch64data.html#asPre	A64Shape.asPre		11
+nim	A64Shape	dynasm/aarch64data.html#A64Shape	enum A64Shape		11
+nim	fRRR	dynasm/aarch64data.html#fRRR	A64Form.fRRR		37
+nim	fRR	dynasm/aarch64data.html#fRR	A64Form.fRR		37
+nim	fRRn	dynasm/aarch64data.html#fRRn	A64Form.fRRn		37
+nim	fXRR	dynasm/aarch64data.html#fXRR	A64Form.fXRR		37
+nim	fRRRR	dynasm/aarch64data.html#fRRRR	A64Form.fRRRR		37
+nim	fRRI12	dynasm/aarch64data.html#fRRI12	A64Form.fRRI12		37
+nim	fLogicI	dynasm/aarch64data.html#fLogicI	A64Form.fLogicI		37
+nim	fMovI	dynasm/aarch64data.html#fMovI	A64Form.fMovI		37
+nim	fMovInv	dynasm/aarch64data.html#fMovInv	A64Form.fMovInv		37
+nim	fMovLogic	dynasm/aarch64data.html#fMovLogic	A64Form.fMovLogic		37
+nim	fMovWide	dynasm/aarch64data.html#fMovWide	A64Form.fMovWide		37
+nim	fBfmI	dynasm/aarch64data.html#fBfmI	A64Form.fBfmI		37
+nim	fMemU	dynasm/aarch64data.html#fMemU	A64Form.fMemU		37
+nim	fMem9	dynasm/aarch64data.html#fMem9	A64Form.fMem9		37
+nim	fPair	dynasm/aarch64data.html#fPair	A64Form.fPair		37
+nim	fMemX	dynasm/aarch64data.html#fMemX	A64Form.fMemX		37
+nim	fBr	dynasm/aarch64data.html#fBr	A64Form.fBr		37
+nim	fCbx	dynasm/aarch64data.html#fCbx	A64Form.fCbx		37
+nim	fTbx	dynasm/aarch64data.html#fTbx	A64Form.fTbx		37
+nim	fAdr	dynasm/aarch64data.html#fAdr	A64Form.fAdr		37
+nim	fBrReg	dynasm/aarch64data.html#fBrReg	A64Form.fBrReg		37
+nim	fMisc	dynasm/aarch64data.html#fMisc	A64Form.fMisc		37
+nim	fHlt	dynasm/aarch64data.html#fHlt	A64Form.fHlt		37
+nim	fFmovI	dynasm/aarch64data.html#fFmovI	A64Form.fFmovI		37
+nim	fFcmp0	dynasm/aarch64data.html#fFcmp0	A64Form.fFcmp0		37
+nim	fVecRRR	dynasm/aarch64data.html#fVecRRR	A64Form.fVecRRR		37
+nim	fVecMovi	dynasm/aarch64data.html#fVecMovi	A64Form.fVecMovi		37
+nim	fVecMoviD	dynasm/aarch64data.html#fVecMoviD	A64Form.fVecMoviD		37
+nim	fDupG	dynasm/aarch64data.html#fDupG	A64Form.fDupG		37
+nim	A64Form	dynasm/aarch64data.html#A64Form	enum A64Form		37
+nim	A64Entry	dynasm/aarch64data.html#A64Entry	tuple A64Entry		68
+nim	a64CondNames	dynasm/aarch64data.html#a64CondNames	const a64CondNames		75
+nim	a64CondBits	dynasm/aarch64data.html#a64CondBits	const a64CondBits		77
+nim	a64ShiftMods	dynasm/aarch64data.html#a64ShiftMods	const a64ShiftMods		80
+nim	a64ExtendMods	dynasm/aarch64data.html#a64ExtendMods	const a64ExtendMods		81
+nim	a64Entries	dynasm/aarch64data.html#a64Entries,string	proc a64Entries(mn: string): seq[A64Entry]		84
+nim	a64Mnemonics	dynasm/aarch64data.html#a64Mnemonics	proc a64Mnemonics(): seq[string]		635

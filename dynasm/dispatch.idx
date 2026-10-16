@@ -1,0 +1,21 @@
+nimTitle	dispatch	dynasm/dispatch.html	module dynasm/dispatch		0
+nim	defaultRegSizeForMem	dynasm/dispatch.html#defaultRegSizeForMem,OpSize,OpSize	proc defaultRegSizeForMem(explicit: OpSize; other: OpSize): OpSize		9
+nim	dynasmMov	dynasm/dispatch.html#dynasmMov,auto,Operand,Operand,bool	proc dynasmMov(a: var auto; dst, src: Operand; isX64: bool)		13
+nim	dynasmLea	dynasm/dispatch.html#dynasmLea,auto,Operand,Operand,bool	proc dynasmLea(a: var auto; dst: Operand; src: Operand; isX64: bool)		67
+nim	dynasmAlu	dynasm/dispatch.html#dynasmAlu,auto,string,Operand,Operand,bool	proc dynasmAlu(a: var auto; mn: string; dst, src: Operand; isX64: bool)		75
+nim	dynasmTest	dynasm/dispatch.html#dynasmTest,auto,Operand,Operand	proc dynasmTest(a: var auto; lhs, rhs: Operand)		104
+nim	dynasmIncDec	dynasm/dispatch.html#dynasmIncDec,auto,string,Operand,bool	proc dynasmIncDec(a: var auto; mn: string; op: Operand; isX64: bool)		113
+nim	dynasmPush	dynasm/dispatch.html#dynasmPush,auto,Operand,bool	proc dynasmPush(a: var auto; op: Operand; isX64: bool)		123
+nim	dynasmPop	dynasm/dispatch.html#dynasmPop,auto,Operand,bool	proc dynasmPop(a: var auto; op: Operand; isX64: bool)		137
+nim	dynasmJmp	dynasm/dispatch.html#dynasmJmp,auto,Operand,bool	proc dynasmJmp(a: var auto; op: Operand; isShort: bool)		143
+nim	dynasmJcc	dynasm/dispatch.html#dynasmJcc,auto,string,Operand,bool	proc dynasmJcc(a: var auto; mn: string; op: Operand; isShort: bool)		154
+nim	dynasmShift	dynasm/dispatch.html#dynasmShift,auto,string,Operand,Operand,bool	proc dynasmShift(a: var auto; mn: string; dst: Operand; count: Operand; isX64: bool)		160
+nim	dynasmImul	dynasm/dispatch.html#dynasmImul,auto,Operand,Operand,bool	proc dynasmImul(a: var auto; dst, src: Operand; isX64: bool)		183
+nim	dynasmImul3	dynasm/dispatch.html#dynasmImul3,auto,Operand,Operand,int64	proc dynasmImul3(a: var auto; dst, src: Operand; imm: int64)		203
+nim	dynasmDivMul	dynasm/dispatch.html#dynasmDivMul,auto,string,Operand,bool	proc dynasmDivMul(a: var auto; mn: string; op: Operand; isX64: bool)		211
+nim	dynasmMovzx	dynasm/dispatch.html#dynasmMovzx,auto,Operand,Operand,bool	proc dynasmMovzx(a: var auto; dst, src: Operand; isX64: bool)		223
+nim	dynasmCall	dynasm/dispatch.html#dynasmCall,auto,Operand,bool	proc dynasmCall(a: var auto; op: Operand; isX64: bool)		240
+nim	dynasmBytes	dynasm/dispatch.html#dynasmBytes,auto,openArray[byte]	proc dynasmBytes(a: var auto; data: openArray[byte])		250
+nim	dynasmBytesStr	dynasm/dispatch.html#dynasmBytesStr,auto,string	proc dynasmBytesStr(a: var auto; s: string)		254
+nim	dynasmRel	dynasm/dispatch.html#dynasmRel,auto,RelocationSize,LabelRef	proc dynasmRel(a: var auto; size: RelocationSize; lr: LabelRef)		258
+nim	dynasmAbs	dynasm/dispatch.html#dynasmAbs,auto,RelocationSize,LabelRef	proc dynasmAbs(a: var auto; size: RelocationSize; lr: LabelRef)		279

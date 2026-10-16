@@ -1,0 +1,2 @@
+nimTitle	macro_dsl	dynasm/macro_dsl.html	module dynasm/macro_dsl		0
+nim	dynasm	dynasm/macro_dsl.html#dynasm.m,untyped,untyped	macro dynasm(ops: untyped; body: untyped): untyped		1006

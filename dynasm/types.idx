@@ -1,0 +1,27 @@
+nimTitle	types	dynasm/types.html	module dynasm/types		0
+nim	AssemblyOffset	dynasm/types.html#AssemblyOffset	type AssemblyOffset		5
+nim	DynamicLabel	dynasm/types.html#DynamicLabel	type DynamicLabel		8
+nim	akX64	dynasm/types.html#akX64	ArchKind.akX64		11
+nim	akX86	dynasm/types.html#akX86	ArchKind.akX86		11
+nim	akAarch64	dynasm/types.html#akAarch64	ArchKind.akAarch64		11
+nim	ArchKind	dynasm/types.html#ArchKind	enum ArchKind		11
+nim	lkLocal	dynasm/types.html#lkLocal	LabelKindDesc.lkLocal		16
+nim	lkGlobal	dynasm/types.html#lkGlobal	LabelKindDesc.lkGlobal		16
+nim	lkDynamic	dynasm/types.html#lkDynamic	LabelKindDesc.lkDynamic		16
+nim	LabelKindDesc	dynasm/types.html#LabelKindDesc	enum LabelKindDesc		16
+nim	dekCheckFailed	dynasm/types.html#dekCheckFailed	DynasmErrorKind.dekCheckFailed		21
+nim	dekDuplicateLabel	dynasm/types.html#dekDuplicateLabel	DynasmErrorKind.dekDuplicateLabel		21
+nim	dekUnknownLabel	dynasm/types.html#dekUnknownLabel	DynasmErrorKind.dekUnknownLabel		21
+nim	dekImpossibleRelocation	dynasm/types.html#dekImpossibleRelocation	DynasmErrorKind.dekImpossibleRelocation		21
+nim	DynasmErrorKind	dynasm/types.html#DynasmErrorKind	enum DynasmErrorKind		21
+nim	DynasmError	dynasm/types.html#DynasmError	object DynasmError		27
+nim	`==`	dynasm/types.html#==,AssemblyOffset,AssemblyOffset	proc `==`(a, b: AssemblyOffset): bool		33
+nim	`==`	dynasm/types.html#==,DynamicLabel,DynamicLabel	proc `==`(a, b: DynamicLabel): bool		34
+nim	`$`	dynasm/types.html#$,AssemblyOffset	proc `$`(o: AssemblyOffset): string		35
+nim	`$`	dynasm/types.html#$,DynamicLabel	proc `$`(d: DynamicLabel): string		36
+nim	checkFailed	dynasm/types.html#checkFailed	proc checkFailed(): ref DynasmError		38
+nim	duplicateLabel	dynasm/types.html#duplicateLabel,string,LabelKindDesc,int	proc duplicateLabel(name: string; k: LabelKindDesc; dynId = -1): ref DynasmError		42
+nim	unknownLabel	dynasm/types.html#unknownLabel,string,LabelKindDesc,int	proc unknownLabel(name: string; k: LabelKindDesc; dynId = -1): ref DynasmError		49
+nim	impossibleRelocation	dynasm/types.html#impossibleRelocation,string	proc impossibleRelocation(msg: string): ref DynasmError		56
+nimgrp	==	dynasm/types.html#==-procs-all	proc		33
+nimgrp	$	dynasm/types.html#$-procs-all	proc		35
