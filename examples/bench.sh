@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # bench.sh — build the dynasm examples and run them.
 #
-# Usage:
-#   ./bench.sh                  # build + run all examples (release builds)
-#   ./bench.sh fib collatz       # run only the given examples
-#   MODE=debug ./bench.sh        # use debug builds instead of release
-#   BENCH_ITERS=10 ./bench.sh    # scale every example's hot loop
-#   RESULTS=bench/custom ./bench.sh  # change log directory
+# Usage (from the repo root):
+#   ./examples/bench.sh                  # build + run all examples (release builds)
+#   ./examples/bench.sh fib collatz       # run only the given examples
+#   MODE=debug ./examples/bench.sh        # use debug builds instead of release
+#   BENCH_ITERS=10 ./examples/bench.sh    # scale every example's hot loop
+#   RESULTS=bench/custom ./examples/bench.sh  # change log directory
 #
 # Each example binary assembles its JIT function (timed), verifies it once
 # against a native Nim reference, then hammers the hot call BENCH_ITERS
@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 case "$(uname -m)" in
   x86_64|amd64) ;;

@@ -31,16 +31,16 @@
 - `examples/nbody.nim` — integer N-body simulation stride loop
 
 Run one with `clue build examples/fib.nim --release --out:/tmp/fib && /tmp/fib`,
-or build and run all 23 with `./bench.sh`, which prints a Markdown table of
+or build and run all 23 with `./examples/bench.sh`, which prints a Markdown table of
 per-call timings.
 
 The bundled examples emit x86-64 code and run on x86-64 hosts only
-(`./bench.sh` says so on other machines). The test suite runs
+(`./examples/bench.sh` says so on other machines). The test suite runs
 everywhere: machine-code execution tests are gated by host CPU, and
 on Apple Silicon the suite executes AArch64 JIT code assembled with
 `arch aarch64` (MAP_JIT + icache handling included).
 
-Latest results (`./bench.sh`):
+Latest results (`./examples/bench.sh`):
 
 | example | bytes | assembled in | wall | cpu | per call |
 |---|---|---|---|---|---|
