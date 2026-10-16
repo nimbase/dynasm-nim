@@ -14,8 +14,8 @@
 
 
 ## Features
-- Pure-Nim dynamic assembler for x64 and x86, no C preprocessor or external tools
-- Macro DSL that lets you write assembly inline in Nim code
+- Pure-Nim dynamic assembler for x64, x86 and AArch64, no C preprocessor or external tools
+- Macro DSL that lets you write assembly inline in Nim code (`arch x64` / `arch aarch64`)
 - Labels, global symbols and relocations resolved at assembly time
 - Strict compile-time validation with suggestions on typos
 - Executable memory buffers you can call as plain function pointers
@@ -64,11 +64,22 @@ Latest results (`./bench.sh`):
 - [x] Executable memory runtime with callable function pointers
 - [x] Strict compile-time validation with suggestions
 - [x] 23 verified JIT examples with self-reported wall/cpu timings
-- [ ] AArch64 backend alongside the current x64/x86 support
+- [x] AArch64 backend: integer core (mov/add/sub/logical/shifts/mul/div,
+  ldr/str/ldp/stp, b/bl/br/cbz/tbz/adr, PC-relative relocations)
+- [x] AArch64 SIMD/FP: scalar fmov/fadd/fcmp/scvtf/fcvt, vector
+  add/mul/logical, dup/movi, SIMD loads/stores (byte-exact vs clang)
+- [ ] AArch64 vector reg lists, lane-indexed forms, fixed-point converts
+- [ ] Wider instruction coverage (SSE/AVX, more forms of existing mnemonics)
 - [ ] Wider instruction coverage (SSE/AVX, more forms of existing mnemonics)
 - [ ] Position-independent code helpers and jump tables
 - [ ] Optional disassembly dump next to the debug code dump
 - [ ] Published nimble release with API docs
+
+Note: SIMD execution tests use [nimsimd](https://github.com/guzba/nimsimd)
+as the test oracle (intrinsic names mirror the asm mnemonics). It is not
+a library dependency — dynasm stays dependency-free; the `when
+defined(arm64)` oracle tests import it only on AArch64 hardware, so
+install it there with `nimble install nimsimd` if you run ARM CI.
 
 Note: this package is a Nim port of the DynASM idea — dynamic assemblers that
 encode machine code at runtime instead of shelling out to an assembler. See

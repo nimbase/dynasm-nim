@@ -11,6 +11,7 @@ type
   ArchKind* = enum
     akX64
     akX86
+    akAarch64
 
   LabelKindDesc* = enum
     lkLocal

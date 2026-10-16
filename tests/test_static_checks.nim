@@ -231,6 +231,201 @@ test "labels, aliases and arch are validated":
       arch x86
       push r8
 
+test "aarch64 shapes are validated":
+  var ops = initVecAssembler(0)
+  rejects:
+    dynasm ops:
+      arch aarch64
+      frobnicate x0, x1
+  rejects:
+    dynasm ops:
+      arch aarch64
+      add x0, x1, 4096
+  rejects:
+    dynasm ops:
+      arch aarch64
+      add x0, x1, 5, lsl, 8
+  rejects:
+    dynasm ops:
+      arch aarch64
+      movz x0, 0x10000
+  rejects:
+    dynasm ops:
+      arch aarch64
+      mov x0, 0x12345678
+  rejects:
+    dynasm ops:
+      arch aarch64
+      ldr x0, [sp, 7]
+  rejects:
+    dynasm ops:
+      arch aarch64
+      ldr x0, [sp, 32768]
+  rejects:
+    dynasm ops:
+      arch aarch64
+      str x0, [sp, 512], pre
+  rejects:
+    dynasm ops:
+      arch aarch64
+      tbz w0, 32, fwd("x")
+  rejects:
+    dynasm ops:
+      arch aarch64
+      tbz x0, fwd("x")
+  rejects:
+    dynasm ops:
+      arch aarch64
+      b x0
+  rejects:
+    dynasm ops:
+      arch aarch64
+      ldr x0, [xzr]
+  rejects:
+    dynasm ops:
+      arch aarch64
+      b extAddr(123)
+  rejects:
+    dynasm ops:
+      arch aarch64
+      hlt 0x10000
+  rejects:
+    dynasm ops:
+      arch aarch64
+      movz x0, 5, lsl, 8
+  rejects:
+    dynasm ops:
+      arch aarch64
+      ldr x0, [x1, x2, lsl, 2]
+  rejects:
+    dynasm ops:
+      arch aarch64
+      ldr x0, [x1, w2, lsl, 2]
+  accepts:
+    dynasm ops:
+      arch aarch64
+      mov x0, x1
+      add x0, x1, x2
+      ldr x0, [sp, 8]
+      str w1, [x2, 4]
+      b fwd("done")
+      label done
+      ret()
+  accepts:
+    dynasm ops:
+      arch aarch64
+      alias base, x0
+      ldr x1, [base, 16]
+      cbz x1, fwd("exitx")
+      label exitx
+      ret()
+
+test "aarch64 SIMD/FP shapes are validated":
+  var ops = initVecAssembler(0)
+  rejects:
+    dynasm ops:
+      arch aarch64
+      fmov s0, 1.1
+  rejects:
+    dynasm ops:
+      arch aarch64
+      fcmp s0, 1.0
+  rejects:
+    dynasm ops:
+      arch aarch64
+      fcmp s0, x0
+  rejects:
+    dynasm ops:
+      arch aarch64
+      add v0.s4, v1.s4, v2.d2
+  rejects:
+    dynasm ops:
+      arch aarch64
+      movi v0.s4, 0x100
+  rejects:
+    dynasm ops:
+      arch aarch64
+      movi v0.s4, 1, lsl, 4
+  rejects:
+    dynasm ops:
+      arch aarch64
+      movi v0.h8, 1, lsl, 16
+  accepts:
+    dynasm ops:
+      arch aarch64
+      movi v0.s4, 1, lsl, 24
+      fmov s0, 2
+      ret()
+  rejects:
+    dynasm ops:
+      arch aarch64
+      movi v0.d2, 0x12345678
+  rejects:
+    dynasm ops:
+      arch aarch64
+      dup v0, w0
+  rejects:
+    dynasm ops:
+      arch aarch64
+      dup v0.b7, w0
+  rejects:
+    dynasm ops:
+      arch aarch64
+      `and` v0.s4, v1.s4, v2.s4
+  rejects:
+    dynasm ops:
+      arch aarch64
+      fadd s0, s0
+  rejects:
+    dynasm ops:
+      arch aarch64
+      ldr s0, [x0, 3]
+  rejects:
+    dynasm ops:
+      arch aarch64
+      fmov s0, x0
+  accepts:
+    dynasm ops:
+      arch aarch64
+      fmov s0, 1.0
+      fadd s0, s1, s2
+      fadd v0.s4, v1.s4, v2.s4
+      ldr q0, [x0, 16]
+      str q0, [x0], 16
+      ret()
+  accepts:
+    dynasm ops:
+      arch aarch64
+      alias base, x0
+      fmov s0, w1
+      scvtf d0, x0
+      ldr s1, [base, 8]
+      ret()
+
+test "cross-arch mnemonics are rejected":
+  var ops = initVecAssembler(0)
+  rejects:
+    dynasm ops:
+      arch aarch64
+      `xor` rax, rbx
+  rejects:
+    dynasm ops:
+      arch x64
+      ldr x0, [x1]
+  rejects:
+    dynasm ops:
+      arch x64
+      svc 0
+  rejects:
+    dynasm ops:
+      arch x64
+      fadd s0, s1, s2
+  rejects:
+    dynasm ops:
+      arch aarch64
+      `xor` rax, rbx
+      mov rax, rbx
+
 test "all-lowercase helper calls are rejected, not silently passed":
   var ops = initVecAssembler(0)
   rejects:

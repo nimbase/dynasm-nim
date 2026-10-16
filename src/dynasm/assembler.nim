@@ -1,5 +1,6 @@
 ## Assemblers: SimpleAssembler, VecAssembler, Assembler (JIT).
-## Mirrors runtime/src/lib.rs + components.rs (x64/x86 SimpleRelocation only).
+## Mirrors runtime/src/lib.rs + components.rs (SimpleRelocation plus
+## AArch64 arch-specific relocations).
 
 import std/tables
 import ./types

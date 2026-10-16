@@ -13,6 +13,8 @@
 import std/macros
 import std/tables
 import std/strutils
+import ./aarch64data
+import ./aarch64match
 
 # Integer literal node kinds. The parser picks IntLit vs Int64Lit (and
 # the suffixed nnkInt8Lit..nnkUInt64Lit forms) by magnitude, so every
@@ -64,9 +66,12 @@ proc getMn(node: NimNode): string =
   else:
     ""
 
-proc isRegName(name: string, aliases: Table[string, string]): bool =
+proc isRegName(name: string, aliases: Table[string, string],
+    a64mode: bool = false): bool =
   let n = name.toLowerAscii
   if n in aliases: return true
+  if a64mode:
+    return a64IsReg(n, aliases)
   n in regTable()
 
 proc resolveRegName(name: string,
@@ -390,12 +395,38 @@ const dynasmInstrWords = ["mov", "movabs", "lea", "add", "sub", "xor",
   "not", "shl", "sal", "shr", "sar", "lock", "rep", "repe", "repz",
   "repne", "repnz"]
 
+# AArch64 mnemonics for `arch aarch64` blocks (unified DSL: same
+# macro, same directives, per-arch instruction tables). Dotted forms
+# (b.eq, mov.inverted, mov.logical) are produced from DotExpr heads.
+const a64InstrWords = ["mov", "mov.inverted", "mov.logical", "movz",
+  "movn", "movk", "add", "adds", "sub", "subs", "cmp", "cmn", "and",
+  "orr", "eor", "ands", "tst", "mvn", "neg", "lsl", "lsr", "asr",
+  "mul", "madd", "msub", "sdiv", "udiv", "ldr", "str", "ldp", "stp",
+  "b", "b.cond", "bl", "br", "blr", "ret", "cbz", "cbnz", "tbz",
+  "tbnz", "adr", "adrp", "nop", "hlt", "svc", "fmov", "fadd",
+  "fsub", "fmul", "fdiv", "fmax", "fmin", "fneg", "fabs", "fsqrt",
+  "fcmp", "fcmpe", "scvtf", "ucvtf", "fcvtzs", "fcvtzu", "fcvt",
+  "dup", "movi", "bic"]
+
+# AArch64-only words (unknown to x86): used for "needs arch aarch64"
+# diagnostics in x64/x86 blocks.
+const a64OnlyWords = ["mov.inverted", "mov.logical", "movz", "movn",
+  "movk", "adds", "subs", "cmn", "orr", "eor", "ands", "tst", "mvn",
+  "lsl", "lsr", "asr", "madd", "msub", "sdiv", "udiv", "ldr", "str",
+  "ldp", "stp", "b", "b.cond", "bl", "br", "blr", "cbz", "cbnz",
+  "tbz",   "tbnz", "adr", "adrp", "svc", "fmov", "fadd", "fsub",
+  "fmul", "fdiv", "fmax", "fmin", "fneg", "fabs", "fsqrt", "fcmp",
+  "fcmpe", "scvtf", "ucvtf", "fcvtzs", "fcvtzu", "fcvt", "dup",
+  "movi", "bic"]
+
 # Statement heads that are Nim, not assembly (Command/Call form only;
 # `let`/`if`/`for`/etc. have their own node kinds and pass through).
 const nimStmtHeads = ["echo", "debugecho", "assert", "static", "asm"]
 
 proc isDynasmWord(mn: string): bool =
   if mn in dynasmDirectiveWords or mn in dynasmInstrWords:
+    return true
+  if mn in a64InstrWords:
     return true
   if mn in aluMnemonics or mn in shiftMnemonics or mn in divMnemonics:
     return true
@@ -445,6 +476,10 @@ proc suggestWord(mn: string): string =
     if d > 0 and d <= thresh:
       cands.add((d, w))
   for w in dynasmInstrWords:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in a64InstrWords:
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
@@ -972,6 +1007,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
   var aliases = initTable[string, string]()
   var globalLabels = initTable[string, bool]()
   var curIsX64 = true
+  var curArchA64 = false
   result = newStmtList()
   # Ensure needed symbols are visible in generated code scope:
   # caller must import dynasm/registers, dispatch, etc. We reference by name.
@@ -991,13 +1027,34 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
     var mn = ""
     var args: seq[NimNode] = @[]
     var rawHead = ""
+    # Condition for dotted b.eq (0-15); 0 = no condition to add.
+    var a64CondBits = 0
     if stmt.kind == nnkCommand:
       if stmt[0].kind == nnkIdent:
         rawHead = stmt[0].strVal
       elif stmt[0].kind == nnkAccQuoted and stmt[0].len > 0 and
           stmt[0][0].kind == nnkIdent:
         rawHead = stmt[0][0].strVal
-      mn = getMn(stmt[0])
+      elif stmt[0].kind == nnkDotExpr and stmt[0].len == 2 and
+          stmt[0][0].kind == nnkIdent and
+          stmt[0][1].kind == nnkIdent:
+        # Dotted AArch64 mnemonics: b.eq, mov.inverted, mov.logical.
+        # Anything else dotted stays Nim code (a.b() calls etc.).
+        let dotBase = stmt[0][0].strVal.toLowerAscii
+        let dotAttr = stmt[0][1].strVal.toLowerAscii
+        if curArchA64 and dotBase == "b" and dotAttr in a64CondNames:
+          rawHead = "b." & dotAttr
+          mn = "b.cond"
+          a64CondBits = a64CondBitsOf(dotAttr)
+        elif curArchA64 and dotBase == "mov" and
+            dotAttr in ["inverted", "logical"]:
+          rawHead = "mov." & dotAttr
+          mn = "mov." & dotAttr
+        else:
+          result.add(copyNimTree(stmt))
+          continue
+      if mn == "":
+        mn = getMn(stmt[0])
       for i in 1..<stmt.len:
         args.add(stmt[i])
     elif stmt.kind == nnkCall:
@@ -1006,7 +1063,24 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       elif stmt[0].kind == nnkAccQuoted and stmt[0].len > 0 and
           stmt[0][0].kind == nnkIdent:
         rawHead = stmt[0][0].strVal
-      mn = getMn(stmt[0])
+      elif stmt[0].kind == nnkDotExpr and stmt[0].len == 2 and
+          stmt[0][0].kind == nnkIdent and
+          stmt[0][1].kind == nnkIdent:
+        let dotBase = stmt[0][0].strVal.toLowerAscii
+        let dotAttr = stmt[0][1].strVal.toLowerAscii
+        if curArchA64 and dotBase == "b" and dotAttr in a64CondNames:
+          rawHead = "b." & dotAttr
+          mn = "b.cond"
+          a64CondBits = a64CondBitsOf(dotAttr)
+        elif curArchA64 and dotBase == "mov" and
+            dotAttr in ["inverted", "logical"]:
+          rawHead = "mov." & dotAttr
+          mn = "mov." & dotAttr
+        else:
+          result.add(copyNimTree(stmt))
+          continue
+      if mn == "":
+        mn = getMn(stmt[0])
       for i in 1..<stmt.len:
         args.add(stmt[i])
     elif stmt.kind == nnkIdent:
@@ -1048,17 +1122,31 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
     # Directives
     if mn == "arch":
       if args.len != 1:
-        error("arch needs 1 arg: x64|x86", stmt)
+        error("arch needs 1 arg: x64|x86|aarch64", stmt)
       let a = getMn(args[0])
       if a == "" and args[0].kind == nnkIdent:
         let s = args[0].strVal.toLowerAscii
-        if s == "x64": curIsX64 = true
-        elif s == "x86": curIsX64 = false
-        else: error("arch must be x64 or x86", stmt)
+        if s == "x64":
+          curIsX64 = true
+          curArchA64 = false
+        elif s == "x86":
+          curIsX64 = false
+          curArchA64 = false
+        elif s in ["aarch64", "arm64"]:
+          curIsX64 = true
+          curArchA64 = true
+        else: error("arch must be x64, x86 or aarch64", stmt)
       else:
-        if a == "x64": curIsX64 = true
-        elif a == "x86": curIsX64 = false
-        else: error("arch must be x64 or x86", stmt)
+        if a == "x64":
+          curIsX64 = true
+          curArchA64 = false
+        elif a == "x86":
+          curIsX64 = false
+          curArchA64 = false
+        elif a in ["aarch64", "arm64"]:
+          curIsX64 = true
+          curArchA64 = true
+        else: error("arch must be x64, x86 or aarch64", stmt)
       continue
     elif mn == "alias":
       if args.len != 2:
@@ -1066,10 +1154,10 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       if args[0].kind != nnkIdent:
         error("alias name must be ident", stmt)
       if args[1].kind != nnkIdent or
-          not isRegName(args[1].strVal, aliases):
+          not isRegName(args[1].strVal, aliases, curArchA64):
         error("alias target must be register", stmt)
       let aliasName = args[0].strVal.toLowerAscii
-      if isRegName(aliasName, aliases):
+      if isRegName(aliasName, aliases, curArchA64):
         error("dynasm: alias name '" & args[0].strVal &
           "' shadows a register; pick another name", args[0])
       if isDynasmWord(aliasName):
@@ -1084,7 +1172,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       if isDynasmWord(labelName):
         error("dynasm: label name '" & args[0].strVal &
           "' collides with an instruction or directive", args[0])
-      if isRegName(labelName, aliases):
+      if isRegName(labelName, aliases, curArchA64):
         error("dynasm: label name '" & args[0].strVal &
           "' collides with a register name", args[0])
       let nm = newLit(args[0].strVal)
@@ -1098,7 +1186,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       if isDynasmWord(labelName):
         error("dynasm: label name '" & args[0].strVal &
           "' collides with an instruction or directive", args[0])
-      if isRegName(labelName, aliases):
+      if isRegName(labelName, aliases, curArchA64):
         error("dynasm: label name '" & args[0].strVal &
           "' collides with a register name", args[0])
       if labelName in globalLabels:
@@ -1270,6 +1358,20 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
           "write prefix as `db 0xF0` + instruction on next line", stmt)
       else:
         error("lock/rep needs instruction after it", stmt)
+      continue
+
+    # AArch64 instructions: unified DSL, per-arch tables.
+    if curArchA64:
+      if not isA64Mn(mn):
+        if mn in dynasmInstrWords or mn in aluMnemonics or
+            mn in shiftMnemonics or mn in divMnemonics or
+            mn in jccMnemonics:
+          error("dynasm: '" & mn &
+            "' is an x86 instruction; use arch x64/x86 for it", stmt)
+        error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
+      let oo = copyNimTree(ops)
+      result.add(a64ProcessInstruction(mn, args, oo, aliases,
+        a64CondBits, stmt))
       continue
 
     # Instructions
@@ -1515,6 +1617,10 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
     else:
       # Unreachable: every known word is handled above, unknown words
       # are rejected at dispatch. Kept as a guard for future edits.
+      if mn in a64OnlyWords:
+        error("dynasm: '" & mn &
+          "' is an AArch64 instruction; use arch aarch64 for it",
+          stmt)
       error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
 
   # -d:dynasmDebug support. The `when` is emitted into the generated

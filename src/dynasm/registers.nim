@@ -1,5 +1,6 @@
-## Register definitions for x64/x86.
-## Runtime codes match references/dynasm-rs/runtime/src/x64.rs and x86.rs.
+## Register definitions for x64/x86 (+ AArch64 Xn/Wn/SP/XZR).
+## Runtime codes match references/dynasm-rs/runtime/src/x64.rs,
+## x86.rs and aarch64.rs.
 
 import ./types
 
@@ -24,6 +25,13 @@ proc regCode*(r: Register): uint8 = r.code
 proc Rq*(idx: int): Register = Register(code: uint8(idx and 0xF), cls: rcGpr)
 proc Rd*(idx: int): Register = Register(code: uint8(idx and 0xF), cls: rcGpr)
 proc Rx*(idx: int): Register = Register(code: uint8(idx and 0xF), cls: rcXmm)
+
+# AArch64 dynamic registers (mirrors dynasm-rs dynamic RegKind):
+# Xreg(n) is 64-bit, Wreg(n) is 32-bit, n masked to 5 bits.
+proc Xreg*(idx: int): Register = Register(code: uint8(idx and 0x1F),
+  cls: rcGpr)
+proc Wreg*(idx: int): Register = Register(code: uint8(idx and 0x1F),
+  cls: rcGpr)
 
 # GPR 64-bit names (also usable as 32/16/8 with size context)
 const
@@ -95,6 +103,80 @@ const
   ch* = Register(code: 5, cls: rcHigh8)
   dh* = Register(code: 6, cls: rcHigh8)
   bh* = Register(code: 7, cls: rcHigh8)
+
+  # AArch64 general-purpose registers. Xn is 64-bit, Wn is 32-bit
+  # (same 5-bit codes, size carried by name like the x64 aliases).
+  # XZR/WZR is the zero register; SP/WSP the stack pointer (same
+  # encoding, code 31 — the macro tells them apart for diagnostics).
+  # NOTE: `sp` keeps its x64 16-bit meaning here; in `arch aarch64`
+  # blocks the macro resolves `sp` to code 31, and hand-written
+  # AArch64 code can use xsp/wsp below.
+  x0* = Register(code: 0, cls: rcGpr)
+  x1* = Register(code: 1, cls: rcGpr)
+  x2* = Register(code: 2, cls: rcGpr)
+  x3* = Register(code: 3, cls: rcGpr)
+  x4* = Register(code: 4, cls: rcGpr)
+  x5* = Register(code: 5, cls: rcGpr)
+  x6* = Register(code: 6, cls: rcGpr)
+  x7* = Register(code: 7, cls: rcGpr)
+  x8* = Register(code: 8, cls: rcGpr)
+  x9* = Register(code: 9, cls: rcGpr)
+  x10* = Register(code: 10, cls: rcGpr)
+  x11* = Register(code: 11, cls: rcGpr)
+  x12* = Register(code: 12, cls: rcGpr)
+  x13* = Register(code: 13, cls: rcGpr)
+  x14* = Register(code: 14, cls: rcGpr)
+  x15* = Register(code: 15, cls: rcGpr)
+  x16* = Register(code: 16, cls: rcGpr)
+  x17* = Register(code: 17, cls: rcGpr)
+  x18* = Register(code: 18, cls: rcGpr)
+  x19* = Register(code: 19, cls: rcGpr)
+  x20* = Register(code: 20, cls: rcGpr)
+  x21* = Register(code: 21, cls: rcGpr)
+  x22* = Register(code: 22, cls: rcGpr)
+  x23* = Register(code: 23, cls: rcGpr)
+  x24* = Register(code: 24, cls: rcGpr)
+  x25* = Register(code: 25, cls: rcGpr)
+  x26* = Register(code: 26, cls: rcGpr)
+  x27* = Register(code: 27, cls: rcGpr)
+  x28* = Register(code: 28, cls: rcGpr)
+  x29* = Register(code: 29, cls: rcGpr)
+  x30* = Register(code: 30, cls: rcGpr)
+  w0* = Register(code: 0, cls: rcGpr)
+  w1* = Register(code: 1, cls: rcGpr)
+  w2* = Register(code: 2, cls: rcGpr)
+  w3* = Register(code: 3, cls: rcGpr)
+  w4* = Register(code: 4, cls: rcGpr)
+  w5* = Register(code: 5, cls: rcGpr)
+  w6* = Register(code: 6, cls: rcGpr)
+  w7* = Register(code: 7, cls: rcGpr)
+  w8* = Register(code: 8, cls: rcGpr)
+  w9* = Register(code: 9, cls: rcGpr)
+  w10* = Register(code: 10, cls: rcGpr)
+  w11* = Register(code: 11, cls: rcGpr)
+  w12* = Register(code: 12, cls: rcGpr)
+  w13* = Register(code: 13, cls: rcGpr)
+  w14* = Register(code: 14, cls: rcGpr)
+  w15* = Register(code: 15, cls: rcGpr)
+  w16* = Register(code: 16, cls: rcGpr)
+  w17* = Register(code: 17, cls: rcGpr)
+  w18* = Register(code: 18, cls: rcGpr)
+  w19* = Register(code: 19, cls: rcGpr)
+  w20* = Register(code: 20, cls: rcGpr)
+  w21* = Register(code: 21, cls: rcGpr)
+  w22* = Register(code: 22, cls: rcGpr)
+  w23* = Register(code: 23, cls: rcGpr)
+  w24* = Register(code: 24, cls: rcGpr)
+  w25* = Register(code: 25, cls: rcGpr)
+  w26* = Register(code: 26, cls: rcGpr)
+  w27* = Register(code: 27, cls: rcGpr)
+  w28* = Register(code: 28, cls: rcGpr)
+  w29* = Register(code: 29, cls: rcGpr)
+  w30* = Register(code: 30, cls: rcGpr)
+  xzr* = Register(code: 31, cls: rcGpr)
+  wzr* = Register(code: 31, cls: rcGpr)
+  xsp* = Register(code: 31, cls: rcGpr)
+  wsp* = Register(code: 31, cls: rcGpr)
 
   # XMM
   xmm0* = Register(code: 0, cls: rcXmm)
@@ -187,6 +269,15 @@ proc memOp*(m: MemOp, s: OpSize = szNone): Operand =
 
 proc labelOp*(l: LabelRef): Operand =
   Operand(kind: okLabelRef, lbl: l)
+
+# Extend-kind codes for AArch64 register-offset memory operands.
+# The option field is derived from these at encode time.
+const
+  A64ExtLsl* = 0
+  A64ExtSxtx* = 1
+  A64ExtSxtw* = 2
+  A64ExtUxtx* = 3
+  A64ExtUxtw* = 4
 
 proc fwd*(name: string, off: int = 0): LabelRef =
   LabelRef(isLabel: true, lkind: lrForward, lname: name, loff: off)
