@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# bench.sh — build the dynasm examples and benchmark them with hyperfine.
+# bench.sh — build the dynasm examples and run them.
 #
 # Usage:
-#   ./bench.sh                  # bench all examples (release builds)
-#   ./bench.sh fib collatz       # bench only the given examples
-#   MODE=debug ./bench.sh        # bench debug builds instead of release
-#   RUNS=30 WARMUP=5 ./bench.sh  # tune hyperfine run counts
-#   RESULTS=bench/custom ./bench.sh  # change export directory
+#   ./bench.sh                  # build + run all examples (release builds)
+#   ./bench.sh fib collatz       # run only the given examples
+#   MODE=debug ./bench.sh        # use debug builds instead of release
+#   BENCH_ITERS=10 ./bench.sh    # scale every example's hot loop
+#   RESULTS=bench/custom ./bench.sh  # change log directory
 #
 # Each example binary assembles its JIT function (timed), verifies it once
 # against a native Nim reference, then hammers the hot call BENCH_ITERS
-# times (env override, per-example default) with a checksum assert while
-# stamping std/monotimes wall time and std/times cpuTime around the loop.
-# hyperfine therefore measures rigorous end-to-end numbers (with warmup,
-# statistics and outlier rejection) while each binary self-reports the
-# spawn-free per-call throughput. Results are exported as Markdown and
-# JSON next to the binaries.
+# times (env override, per-example default) while stamping std/monotimes
+# wall time and std/times cpuTime around the loop. The binaries therefore
+# self-report spawn-free per-call throughput; this script just builds
+# them and runs them, saving each binary's output to a log file.
 
 set -euo pipefail
 
@@ -25,17 +23,8 @@ EXAMPLES=(fib loop_sum collatz primes mandel sieve bubble_sort nested_loops
   tail_recursive array_sum gcd dot_product nbody matmul saxpy histogram
   histogram_big fannkuch queens heapsort heapsort_big strings nbody_float)
 MODE="${MODE:-release}"
-RUNS="${RUNS:-20}"
-WARMUP="${WARMUP:-3}"
 OUT="${OUT:-bin}"
 RESULTS="${RESULTS:-bench/results}"
-
-if ! command -v hyperfine >/dev/null 2>&1; then
-  echo "error: hyperfine not found. Install it first:" >&2
-  echo "  brew install hyperfine   # macOS" >&2
-  echo "  cargo install hyperfine  # anywhere with Rust" >&2
-  exit 1
-fi
 
 if [ "$#" -gt 0 ]; then
   EXAMPLES=("$@")
@@ -61,16 +50,33 @@ for ex in "${EXAMPLES[@]}"; do
   clue build "examples/$ex.nim" "${BUILD_FLAGS[@]}" --out:"$OUT/$ex" >/dev/null
 done
 
-echo "==> benchmarking [runs=$RUNS warmup=$WARMUP]"
+echo "==> running [BENCH_ITERS=${BENCH_ITERS:-<per-example default>}]"
 for ex in "${EXAMPLES[@]}"; do
   echo "  - $ex"
-  hyperfine \
-    --shell=none \
-    --warmup "$WARMUP" \
-    --runs "$RUNS" \
-    --export-markdown "$RESULTS/$ex.md" \
-    --export-json "$RESULTS/$ex.json" \
-    "$OUT/$ex"
+  "$OUT/$ex" | tee "$RESULTS/$ex.log"
 done
 
-echo "==> results in $RESULTS/ (.md + .json per example)"
+# Collect each binary's self-reported numbers into a Markdown table.
+TABLE="| example | bytes | assembled in | result | wall | cpu | per call |
+|---|---|---|---|---|---|---|"
+for ex in "${EXAMPLES[@]}"; do
+  log="$RESULTS/$ex.log"
+  asm="$(grep -m1 '^assembled ' "$log" || true)"
+  bytes="$(echo "$asm" | awk '{print $2}')"
+  asmtime="$(echo "$asm" | awk '{print $5, $6}')"
+  line="$(tail -n 1 "$log")"
+  # Split at the trailing "<wall> wall, <cpu> cpu, <per>/call" suffix;
+  # result details may themselves contain colons (e.g. sieve).
+  timing="$(echo "$line" | sed 's/^.*: \([0-9.]* [a-z]* wall, .*\/call\)$/\1/')"
+  detail="$(echo "$line" | sed 's/: [0-9.]* [a-z]* wall, .*\/call$//')"
+  wall="${timing%% wall,*}"
+  rest="${timing#*, }"
+  cpu="${rest%% cpu,*}"
+  per="${rest##*, }"
+  TABLE="$TABLE
+| $ex | $bytes | $asmtime | $detail | $wall | $cpu | $per |"
+done
+
+echo "$TABLE" | tee "$RESULTS/SUMMARY.md"
+
+echo "==> logs in $RESULTS/ (.log per example + SUMMARY.md)"
