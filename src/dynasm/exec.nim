@@ -133,9 +133,11 @@ proc makeExecutable*(mem: pointer, mapped, length: int) =
         addr oldProtect) == 0:
       raise newException(IOError, "VirtualProtect RX failed")
   elif defined(macosx) and defined(arm64):
-    # No mprotect dance on Apple Silicon: pages stay RW+MAP_JIT and
-    # the thread gate + icache flush make them safely executable.
+    # MAP_JIT pages need all three: gate closed, RX transition
+    # (executing a RW page raises SIGBUS on Apple Silicon), flush.
     jitAllowWrites(false)
+    if mprotect(mem, mapped, PROT_READ or PROT_EXEC) != 0:
+      raise newException(IOError, "mprotect RX failed")
   else:
     if mprotect(mem, mapped, PROT_READ or PROT_EXEC) != 0:
       raise newException(IOError, "mprotect RX failed")
@@ -154,6 +156,11 @@ proc makeWritable*(mem: pointer, mapped: int) =
         addr oldProtect) == 0:
       raise newException(IOError, "VirtualProtect RW failed")
   elif defined(macosx) and defined(arm64):
+    # RX->RW must also go through mprotect: after the first commit
+    # the mapping is RX, and the open gate alone does not restore
+    # writability.
+    if mprotect(mem, mapped, PROT_READ or PROT_WRITE) != 0:
+      raise newException(IOError, "mprotect RW failed")
     jitAllowWrites(true)
   else:
     if mprotect(mem, mapped, PROT_READ or PROT_WRITE) != 0:
