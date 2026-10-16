@@ -19,6 +19,17 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+case "$(uname -m)" in
+  x86_64|amd64) ;;
+  *)
+    echo "error: the bundled examples emit x86-64 machine code and can" >&2
+    echo "only run on x86-64 (this host is $(uname -m)). The dynasm DSL" >&2
+    echo "itself supports AArch64 via \`arch aarch64\`; ported examples" >&2
+    echo "are future work." >&2
+    exit 1
+    ;;
+esac
+
 EXAMPLES=(fib loop_sum collatz primes mandel sieve bubble_sort nested_loops
   tail_recursive array_sum gcd dot_product nbody matmul saxpy histogram
   histogram_big fannkuch queens heapsort heapsort_big strings nbody_float)

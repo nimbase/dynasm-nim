@@ -9,9 +9,9 @@ import dynasm
 # dynasm-rs (element letter first; ARM's lane-first `vN.4s` is
 # unparseable in both Rust and Nim).
 #
-# NOTE: this host is x86_64, so emitted code is verified by bytes
-# only, never executed. The nimsimd-oracle execution test at the
-# bottom runs only on AArch64 hardware (needs `nimsimd` installed).
+# NOTE: on other hosts the golden tests below verify bytes only and
+# the execution test at the bottom runs solely on AArch64 hardware
+# (dependency-free scalar-loop oracle).
 
 proc word(code: seq[byte], idx: int): uint32 =
   uint32(code[idx]) or (uint32(code[idx+1]) shl 8) or
@@ -207,13 +207,15 @@ test "aarch64 float immediate helpers":
   check encodeStretchedImm(0x123456789ABCDEF'u64) < 0
 
 when defined(arm64):
-  # Execution tests against the nimsimd oracle (needs nimsimd
-  # installed). They only compile on AArch64 hardware. Everything
-  # else (assembler, registers, exec buffer) comes from the top
+  # Execution test: runs by default on AArch64 hardware with no
+  # extra packages. The oracle is a plain scalar loop — every lane
+  # is one correctly-rounded float32 addition, and the chosen inputs
+  # have exactly representable sums (2.0, 0.0, 2.0, 12.5), so the
+  # scalar result is bit-identical to the vector one. Everything
+  # (assembler, registers, exec buffer) comes from the top
   # `import dynasm`.
-  import nimsimd/neon
 
-  test "aarch64 JIT fadd matches nimsimd":
+  test "aarch64 JIT fadd executes correctly":
     proc buildFadd(): ExecutableBuffer =
       var a = newAssembler(akAarch64)
       dynasm a:
@@ -231,8 +233,7 @@ when defined(arm64):
     var y = [0.5'f32, 2.0, -1.25, 8.0]
     var z = [0'f32, 0, 0, 0]
     f(addr x[0], addr y[0], addr z[0])
-    let want = vaddq_f32(vld1q_f32(addr x[0]), vld1q_f32(addr y[0]))
     var w = [0'f32, 0, 0, 0]
-    vst1q_f32(addr w[0], want)
+    for i in 0..3: w[i] = x[i] + y[i]
     check z == w
     buf.destroy()

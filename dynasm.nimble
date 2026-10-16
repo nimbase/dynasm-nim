@@ -8,5 +8,10 @@ srcDir        = "src"
 
 
 # Dependencies
+#
+# Note: intentionally dependency-free (pure Nim, no C libraries).
+# Even the AArch64 execution tests use a scalar loop as oracle so
+# that ARM CI needs no extra packages.
 
-requires "nim >= 2.3.1"
+# Floor verified against the 2.2 series (CI installs `stable`).
+requires "nim >= 2.2.0"

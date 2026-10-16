@@ -433,6 +433,9 @@ proc ensureExecCapacity*(a: var Assembler, need: int) =
     newSize *= 2
   let oldAddr = a.execAddr
   let (nm, _) = allocWritable(newSize)
+  # Open the JIT write gate before copying: a previous commit may
+  # have left it closed (Apple Silicon; no-op elsewhere).
+  makeWritable(nm, newSize)
   # copy committed bytes
   if a.committed.len > 0:
     copyMem(nm, unsafeAddr a.committed[0], a.committed.len)

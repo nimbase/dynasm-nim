@@ -16,9 +16,12 @@
 ## Features
 - Pure-Nim dynamic assembler for x64, x86 and AArch64, no C preprocessor or external tools
 - Macro DSL that lets you write assembly inline in Nim code (`arch x64` / `arch aarch64`)
+- AArch64 SIMD/FP: scalar and vector floating-point, conversions, SIMD loads/stores
+- Apple Silicon support: JIT execution via MAP_JIT with icache handling
 - Labels, global symbols and relocations resolved at assembly time
 - Strict compile-time validation with suggestions on typos
 - Executable memory buffers you can call as plain function pointers
+- Test suite runs everywhere with execution tests gated by host CPU
 - Debug mode that dumps the generated machine code
 
 ## Examples
@@ -30,6 +33,12 @@
 Run one with `clue build examples/fib.nim --release --out:/tmp/fib && /tmp/fib`,
 or build and run all 23 with `./bench.sh`, which prints a Markdown table of
 per-call timings.
+
+The bundled examples emit x86-64 code and run on x86-64 hosts only
+(`./bench.sh` says so on other machines). The test suite runs
+everywhere: machine-code execution tests are gated by host CPU, and
+on Apple Silicon the suite executes AArch64 JIT code assembled with
+`arch aarch64` (MAP_JIT + icache handling included).
 
 Latest results (`./bench.sh`):
 
@@ -68,18 +77,12 @@ Latest results (`./bench.sh`):
   ldr/str/ldp/stp, b/bl/br/cbz/tbz/adr, PC-relative relocations)
 - [x] AArch64 SIMD/FP: scalar fmov/fadd/fcmp/scvtf/fcvt, vector
   add/mul/logical, dup/movi, SIMD loads/stores (byte-exact vs clang)
+- [x] Apple Silicon CI: host-gated execution tests, AArch64 JIT executed on hardware
 - [ ] AArch64 vector reg lists, lane-indexed forms, fixed-point converts
-- [ ] Wider instruction coverage (SSE/AVX, more forms of existing mnemonics)
 - [ ] Wider instruction coverage (SSE/AVX, more forms of existing mnemonics)
 - [ ] Position-independent code helpers and jump tables
 - [ ] Optional disassembly dump next to the debug code dump
 - [ ] Published nimble release with API docs
-
-Note: SIMD execution tests use [nimsimd](https://github.com/guzba/nimsimd)
-as the test oracle (intrinsic names mirror the asm mnemonics). It is not
-a library dependency — dynasm stays dependency-free; the `when
-defined(arm64)` oracle tests import it only on AArch64 hardware, so
-install it there with `nimble install nimsimd` if you run ARM CI.
 
 Note: this package is a Nim port of the DynASM idea — dynamic assemblers that
 encode machine code at runtime instead of shelling out to an assembler. See
