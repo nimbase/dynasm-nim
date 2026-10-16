@@ -33,6 +33,7 @@ type
     asLbl   ## label reference (fwd/bwd/glob/dyn/extaddr-free)
     asMod   ## shift/extend modifier ident (lsl/lsr/asr/ror/...)
     asPre   ## trailing `pre` marker
+    asCond  ## condition name ident (eq/ne/cs/... for cset)
 
   A64Form* = enum
     fRRR      ## R(0), R(5), R(16)
@@ -64,6 +65,7 @@ type
     fVecMovi     ## movi Vn.4S/2S/H/B, #imm8 (, lsl)
     fVecMoviD    ## movi Dn/2D, #stretched
     fDupG     ## dup Vn.<arr>, Rn/Wn: R(0), R(5), Q bit
+    fCSet     ## cset: R(0) + inverted cond bits ORed in by matcher
 
   A64Entry* = tuple
     base: uint32
@@ -457,6 +459,13 @@ proc a64Entries*(mn: string): seq[A64Entry] =
     @[
       (0xB5000000'u32, @[asX, asLbl], fCbx, AarchBCond),
       (0x35000000'u32, @[asW, asLbl], fCbx, AarchBCond),
+    ]
+  of "cset":
+    @[
+      # CSET Wd, cond = CSINC Wd, WZR, WZR, !cond. The inverted cond
+      # field is ORed into the zero cond slot by the matcher (fCSet).
+      (0x1A9F07E0'u32, @[asW, asCond], fCSet, -1),
+      (0x9A9F07E0'u32, @[asX, asCond], fCSet, -1),
     ]
   of "tbz":
     @[

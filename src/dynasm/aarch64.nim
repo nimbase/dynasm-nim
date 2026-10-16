@@ -163,6 +163,11 @@ proc a64RRRR*(a: var auto, base: uint32, rd, rn, rm, ra: Register) =
   emitWord(a, base or rcode(rd) or (rcode(rn) shl 5) or
     (rcode(rm) shl 16) or (rcode(ra) shl 10))
 
+proc a64CSet*(a: var auto, base: uint32, rd: Register) =
+  ## R(0): cset (CSINC Wd/Xd, WZR, WZR, !cond with the inverted
+  ## condition and sf baked into base by the matcher).
+  emitWord(a, base or rcode(rd))
+
 # --------------------------------------------------------------------------
 # Data-processing immediates
 # --------------------------------------------------------------------------

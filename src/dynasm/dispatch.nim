@@ -157,6 +157,20 @@ proc dynasmJcc*(a: var auto, mn: string, op: Operand, isShort: bool) =
   if isShort: encJccShort(a, mn, op.lbl)
   else: encJcc(a, mn, op.lbl)
 
+proc dynasmSetcc*(a: var auto, mn: string, op: Operand, isX64: bool) =
+  if op.kind == okReg:
+    let sz = if op.regSize != szNone: op.regSize else: sz8
+    if sz != sz8:
+      raise impossibleRelocation(mn & " needs a byte register")
+    encSetccReg(a, mn, op.reg)
+  elif op.kind == okMem:
+    let sz = if op.memSize != szNone: op.memSize else: sz8
+    if sz != sz8:
+      raise impossibleRelocation(mn & " needs byte-sized memory")
+    encSetccMem(a, mn, op.mem, isX64)
+  else:
+    raise impossibleRelocation(mn & " needs a byte register or memory")
+
 proc dynasmShift*(a: var auto, mn: string, dst: Operand, count: Operand,
     isX64: bool) =
   let sz = if dst.kind == okReg and dst.regSize != szNone: dst.regSize

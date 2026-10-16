@@ -279,6 +279,10 @@ proc a64Classify(mn: string, node: NimNode,
       return A64Arg(shape: asMod, node: node)
     if n == "pre":
       return A64Arg(shape: asPre, node: node)
+    if mn == "cset" and n in a64CondNames:
+      # Scoped to cset: a bare `eq` elsewhere stays a dynamic
+      # immediate (a Nim variable may legitimately be named so).
+      return A64Arg(shape: asCond, node: node)
     # Anything else: a dynamic immediate expression (a bare Nim
     # identifier evaluates at runtime). Matches rs, where unknown
     # idents fall into the dynamic-immediate path.
@@ -381,6 +385,7 @@ proc a64ShapeName(s: A64Shape): string =
   of asLbl: "label"
   of asMod: "mod"
   of asPre: "pre"
+  of asCond: "cond"
 
 proc a64ShapesFit(entry: seq[A64Shape], cls: seq[A64Arg]): bool =
   ## Entry shapes accept the classified args. Like rs Matcher::XSP,
@@ -669,6 +674,11 @@ proc a64CheckVecSame(mn: string, a, b, c: A64Arg, stmt: NimNode) =
       "' vector operands need the same arrangement, e.g. v0.s4, " &
       "v1.s4, v2.s4", stmt)
 
+proc a64CondBitsOf*(name: string): int =
+  for i, n in a64CondNames:
+    if n == name: return a64CondBits[i]
+  -1
+
 proc a64Emit*(mn: string, entry: A64Entry, args: seq[NimNode],
     argInfo: seq[A64Arg], ops: NimNode,
     aliases: Table[string, string], condBits: int,
@@ -748,6 +758,24 @@ proc a64Emit*(mn: string, entry: A64Entry, args: seq[NimNode],
       regExpr(args[1], aliases), regExpr(args[2], aliases),
       regExpr(args[3], aliases))
     return quote do: a64RRRR(`o`, `baseLit`, `d`, `s1`, `s2`, `s3`)
+  of fCSet:
+    let d = regExpr(args[0], aliases)
+    if args[1].kind != nnkIdent:
+      error("dynasm: '" & mn & "' condition must be a name like " &
+        "eq, ne, lt or gt", args[1])
+    let cname = a64ResolveIdent(args[1].strVal, aliases)
+    let cbits = a64CondBitsOf(cname)
+    if cbits < 0:
+      error("dynasm: '" & mn & "' unknown condition '" &
+        args[1].strVal & "'", args[1])
+    if cbits >= 14:
+      # al/nv: the architecture leaves CSET(!cond) undefined for
+      # them and assemblers reject them.
+      error("dynasm: '" & mn & "' condition '" & args[1].strVal &
+        "' is not valid here; use a conditional condition", args[1])
+    # CSET reads the inverted condition.
+    let cField = newLit(int(entry.base) + ((cbits xor 1) shl 12))
+    return quote do: a64CSet(`o`, `cField`, `d`)
   of fRRI12:
     var rd, rn, imm, shift, immNode: NimNode
     shift = newLit(0)
@@ -1024,11 +1052,6 @@ proc a64Emit*(mn: string, entry: A64Entry, args: seq[NimNode],
 
 proc isA64Mn*(mn: string): bool =
   a64Entries(mn).len > 0
-
-proc a64CondBitsOf*(name: string): int =
-  for i, n in a64CondNames:
-    if n == name: return a64CondBits[i]
-  -1
 
 proc a64ProcessInstruction*(mn: string, args: seq[NimNode],
     ops: NimNode, aliases: Table[string, string], condBits: int,

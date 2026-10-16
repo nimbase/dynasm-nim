@@ -381,6 +381,11 @@ const jccMnemonics = ["jo", "jno", "jb", "jnae", "jc", "jnb", "jae", "jnc",
   "jz", "je", "jnz", "jne", "jbe", "jna", "ja", "jnbe", "js", "jns",
   "jp", "jpe", "jnp", "jpo", "jl", "jnge", "jge", "jnl", "jle", "jng",
   "jg", "jnle"]
+const setccMnemonics = ["seto", "setno", "setb", "setnae", "setc",
+  "setnb", "setae", "setnc", "setz", "sete", "setnz", "setne",
+  "setbe", "setna", "seta", "setnbe", "sets", "setns", "setp",
+  "setpe", "setnp", "setpo", "setl", "setnge", "setge", "setnl",
+  "setle", "setng", "setg", "setnle"]
 
 const dynasmDirectiveWords = ["arch", "alias", "label", "locallabel",
   "global", "globallabel", "dynamiclabel", "binddyn", "dynlabel", "align",
@@ -406,7 +411,7 @@ const a64InstrWords = ["mov", "mov.inverted", "mov.logical", "movz",
   "tbnz", "adr", "adrp", "nop", "hlt", "svc", "fmov", "fadd",
   "fsub", "fmul", "fdiv", "fmax", "fmin", "fneg", "fabs", "fsqrt",
   "fcmp", "fcmpe", "scvtf", "ucvtf", "fcvtzs", "fcvtzu", "fcvt",
-  "dup", "movi", "bic"]
+  "dup", "movi", "bic", "cset"]
 
 # AArch64-only words (unknown to x86): used for "needs arch aarch64"
 # diagnostics in x64/x86 blocks.
@@ -417,7 +422,7 @@ const a64OnlyWords = ["mov.inverted", "mov.logical", "movz", "movn",
   "tbz",   "tbnz", "adr", "adrp", "svc", "fmov", "fadd", "fsub",
   "fmul", "fdiv", "fmax", "fmin", "fneg", "fabs", "fsqrt", "fcmp",
   "fcmpe", "scvtf", "ucvtf", "fcvtzs", "fcvtzu", "fcvt", "dup",
-  "movi", "bic"]
+  "movi", "bic", "cset"]
 
 # Statement heads that are Nim, not assembly (Command/Call form only;
 # `let`/`if`/`for`/etc. have their own node kinds and pass through).
@@ -431,6 +436,8 @@ proc isDynasmWord(mn: string): bool =
   if mn in aluMnemonics or mn in shiftMnemonics or mn in divMnemonics:
     return true
   if mn in jccMnemonics:
+    return true
+  if mn in setccMnemonics:
     return true
   if mn.endsWith("_short") and mn[0..^7] in jccMnemonics:
     return true
@@ -484,6 +491,10 @@ proc suggestWord(mn: string): string =
     if d > 0 and d <= thresh:
       cands.add((d, w))
   for w in jccMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in setccMnemonics:
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
@@ -993,6 +1004,21 @@ proc validateMovzx(args: seq[NimNode], aliases: Table[string, string],
     error("dynasm: 'movzx' source must be a byte/word register or " &
       "memory", args[1])
 
+proc validateSetcc(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  if d.kind == oskReg:
+    if d.size != "" and d.size != "sz8" and d.size != "szNone":
+      error("dynasm: '" & mn & "' needs a byte register like al, " &
+        "spl or r8b", args[0])
+  elif d.kind == oskMem:
+    if d.size != "" and d.size != "sz8" and d.size != "szNone":
+      error("dynasm: '" & mn & "' needs byte-sized memory, e.g. " &
+        "sete byte [rdi]", args[0])
+  elif d.kind != oskOther:
+    error("dynasm: '" & mn & "' needs a byte register or memory",
+      args[0])
+
 proc validateLabelRefArg(mn: string, arg: NimNode, stmt: NimNode) =
   if not isLabelRefNode(arg):
     error("dynasm: '" & mn &
@@ -1364,7 +1390,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       if not isA64Mn(mn):
         if mn in dynasmInstrWords or mn in aluMnemonics or
             mn in shiftMnemonics or mn in divMnemonics or
-            mn in jccMnemonics:
+            mn in jccMnemonics or mn in setccMnemonics:
           error("dynasm: '" & mn &
             "' is an x86 instruction; use arch x64/x86 for it", stmt)
         error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
@@ -1507,6 +1533,15 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       let shortLit = newLit(isShort)
       result.add(quote do: dynasmJcc(`o`, `baseLit`, `targetNode`,
         `shortLit`))
+      continue
+    elif mn in setccMnemonics:
+      if args.len != 1:
+        error(mn & " needs 1 arg", stmt)
+      validateCommon(mn, args, aliases, curIsX64, stmt)
+      validateSetcc(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let mnLit = newLit(mn)
+      result.add(quote do: dynasmSetcc(`o`, `mnLit`, `d`, `isX64Lit`))
       continue
     elif mn in shiftMnemonics:
       if args.len != 2:

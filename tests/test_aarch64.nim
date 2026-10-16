@@ -218,3 +218,21 @@ test "aarch64 logical immediates":
   check word(code, 8) == (0x92800000'u32 or
     ((0xEDCB'u32) shl 5) or (2'u32 shl 21))
   check word(code, 12) == 0xD65F03C0'u32
+
+test "aarch64 cset":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch aarch64
+    cset w9, eq
+    cset w9, lt
+    cset w9, gt
+    cset x5, ne
+    cset w1, hs
+    ret()
+  let code = ops.finalize()
+  check word(code, 0) == 0x1A9F17E9'u32  # cset w9, eq (clang-verified)
+  check word(code, 4) == 0x1A9FA7E9'u32  # cset w9, lt (clang-verified)
+  check word(code, 8) == 0x1A9FD7E9'u32  # cset w9, gt (clang-verified)
+  check word(code, 12) == 0x9A9F07E5'u32 # cset x5, ne (clang-verified)
+  check word(code, 16) == 0x1A9F37E1'u32 # cset w1, hs (clang-verified)
+  check word(code, 20) == 0xD65F03C0'u32

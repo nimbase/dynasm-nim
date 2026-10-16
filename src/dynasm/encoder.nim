@@ -498,6 +498,36 @@ proc encJccShort*(a: var auto, mn: string, lr: LabelRef) =
   of lrAbsolute:
     raise impossibleRelocation("jcc short absolute")
 
+proc setccCode(mn: string): uint8 =
+  ## SETcc shares condition encodings with Jcc: map setXX -> jXX.
+  if mn.len > 3 and mn[0..2] == "set":
+    return jccCode("j" & mn[3..^1])
+  raise impossibleRelocation("unknown setcc " & mn)
+
+proc encSetccReg*(a: var auto, mn: string, reg: Register) =
+  ## SETcc r8: 0F 9x /0. REX.B for r8b-r15b, forced REX for
+  ## spl/bpl/sil/dil; AH/CH/DH/BH encode without REX.
+  let cc = setccCode(mn)
+  var force = isLow8NeedingRex(reg)
+  if isHigh8(reg):
+    force = false
+  let b = (reg.code and 8) != 0
+  emitRexIfNeeded(a, false, false, false, b, force)
+  a.push(0x0F'u8)
+  a.push(cast[uint8](0x90 or cc))
+  a.push(modrmByte(3, 0, reg.code and 7))
+
+proc encSetccMem*(a: var auto, mn: string, mem: MemOp, isX64: bool) =
+  ## SETcc m8: 0F 9x /0 with a ModRM/SIB memory operand.
+  let cc = setccCode(mn)
+  var b, x: bool
+  if mem.hasBase and (mem.base.code and 8) != 0: b = true
+  if mem.hasIndex and (mem.index.code and 8) != 0: x = true
+  emitRexIfNeeded(a, false, false, x, b)
+  a.push(0x0F'u8)
+  a.push(cast[uint8](0x90 or cc))
+  emitMemModRMSIB(a, mem, 0, isX64)
+
 proc encCallRel*(a: var auto, lr: LabelRef) =
   a.push(0xE8'u8)
   a.push(0'u8); a.push(0'u8); a.push(0'u8); a.push(0'u8)

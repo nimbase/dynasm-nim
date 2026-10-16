@@ -463,3 +463,57 @@ test "genuine Nim still passes through":
     dynasm ops:
       arch x64
       mov rax, glob("hello")
+
+test "setcc operand rules":
+  var ops = initVecAssembler(0)
+  rejects:
+    dynasm ops:
+      arch x64
+      sete rax
+  rejects:
+    dynasm ops:
+      arch x64
+      sete al, cl
+  rejects:
+    dynasm ops:
+      arch x64
+      sete dword [rbx]
+  rejects:
+    dynasm ops:
+      arch x64
+      sete 5
+  accepts:
+    dynasm ops:
+      arch x64
+      sete al
+  accepts:
+    dynasm ops:
+      arch x64
+      setg byte [rbx+8]
+
+test "cset rules":
+  var ops = initVecAssembler(0)
+  rejects:
+    dynasm ops:
+      arch aarch64
+      cset w0, al
+  rejects:
+    dynasm ops:
+      arch aarch64
+      cset w0, frobnicate
+  rejects:
+    dynasm ops:
+      arch aarch64
+      cset x0
+  rejects:
+    dynasm ops:
+      arch aarch64
+      cset w0, 5
+  rejects:
+    dynasm ops:
+      arch x64
+      cset w0, eq
+  accepts:
+    dynasm ops:
+      arch aarch64
+      cset w9, eq
