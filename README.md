@@ -59,6 +59,17 @@ Latest results (`./bench.sh`):
 | strings | 146 | 46.94 us | strings(64k) ok x300 iters | 36.67 ms | 0.036s | 122.23 us/call |
 | nbody_float | 141 | 59.24 us | nbody_float(5 bodies, 200000 steps) checksum -3.776412516032224e-11 x3 iters | 32.85 ms | 0.033s | 10.950 ms/call |
 
+## Roadmap
+- [x] Pure-Nim macro DSL assembler for x64 and x86
+- [x] Executable memory runtime with callable function pointers
+- [x] Strict compile-time validation with suggestions
+- [x] 23 verified JIT examples with self-reported wall/cpu timings
+- [ ] AArch64 backend alongside the current x64/x86 support
+- [ ] Wider instruction coverage (SSE/AVX, more forms of existing mnemonics)
+- [ ] Position-independent code helpers and jump tables
+- [ ] Optional disassembly dump next to the debug code dump
+- [ ] Published nimble release with API docs
+
 Note: this package is a Nim port of the DynASM idea — dynamic assemblers that
 encode machine code at runtime instead of shelling out to an assembler. See
 [dynasm-rs](https://github.com/CensoredUsername/dynasm-rs) for the Rust
