@@ -5,3 +5,5 @@ jobs:
     uses: nimbase/setup-nim-action/.github/workflows/test_clue.yml@main
     with:
       nim-version: stable
+      # macos-15 is ARM64, macos-15-intel is x86_64 (both standard hosted).
+      os: '[{"os":"ubuntu-latest"},{"os":"windows-latest"},{"os":"macos-15"},{"os":"macos-15-intel"}]'
