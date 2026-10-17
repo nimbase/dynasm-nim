@@ -54,119 +54,188 @@ AAPCS64 on all three OSes.
 
 ### macOS x86-64 (macos-15-intel)
 
+(`bench` run `39070459914`, all green.)
+
 | example | bytes | assembled in | wall | cpu | per call |
 |---|---|---|---|---|---|
-| fib | 73 | 53.44 us | 14.35 ms | 0.014s | 28.7 ns/call |
-| loop_sum | 42 | 52.88 us | 23.90 ms | 0.024s | 239.00 us/call |
-| collatz | 80 | 56.52 us | 32.94 ms | 0.033s | 109.8 ns/call |
-| primes | 99 | 61.55 us | 43.67 ms | 0.044s | 727.8 ns/call |
-| mandel | 106 | 60.94 us | 24.28 ms | 0.024s | 121.4 ns/call |
-| sieve | 133 | 66.57 us | 3.88 ms | 0.004s | 77.5 ns/call |
-| bubble_sort | 95 | 53.56 us | 5.00 ms | 0.005s | 416.7 ns/call |
-| nested_loops | 59 | 57.97 us | 24.35 ms | 0.024s | 121.74 us/call |
-| tail_recursive | 30 | 50.75 us | 7.12 ms | 0.007s | 17.8 ns/call |
-| array_sum | 35 | 43.97 us | 17.48 ms | 0.017s | 34.95 us/call |
-| gcd | 37 | 52.26 us | 15.02 ms | 0.015s | 18.8 ns/call |
-| dot_product | 40 | 45.02 us | 14.05 ms | 0.014s | 7.03 us/call |
-| nbody | 147 | 63.68 us | 105.72 ms | 0.106s | 105.721 ms/call |
-| matmul | 129 | 79.85 us | 191.61 ms | 0.192s | 95.807 ms/call |
-| saxpy | 38 | 65.67 us | 159.16 ms | 0.159s | 7.958 ms/call |
-| histogram | 32 | 52.44 us | 14.43 ms | 0.014s | 480.96 us/call |
-| histogram_big | 32 | 53.34 us | 48.51 ms | 0.049s | 16.171 ms/call |
-| fannkuch | 254 | 87.65 us | 380.62 ms | 0.381s | 190.308 ms/call |
-| queens | 199 | 89.50 us | 652.68 ms | 0.653s | 652.678 ms/call |
-| heapsort | 211 | 59.16 us | 12.28 ms | 0.012s | 307.06 us/call |
-| heapsort_big | 211 | 67.77 us | 19.43 ms | 0.019s | 19.431 ms/call |
-| strings | 150 | 56.49 us | 39.40 ms | 0.039s | 131.34 us/call |
-| nbody_float | 141 | 65.14 us | 108.59 ms | 0.109s | 36.198 ms/call |
+| fib | 73 | 82.33 us | 23.62 ms | 0.024s | 47.2 ns/call |
+| loop_sum | 42 | 98.59 us | 49.95 ms | 0.050s | 499.53 us/call |
+| collatz | 80 | 109.88 us | 45.71 ms | 0.046s | 152.4 ns/call |
+| primes | 99 | 135.17 us | 65.72 ms | 0.065s | 1.10 us/call |
+| mandel | 106 | 95.14 us | 35.78 ms | 0.035s | 178.9 ns/call |
+| sieve | 133 | 109.14 us | 4.76 ms | 0.005s | 95.1 ns/call |
+| bubble_sort | 95 | 83.30 us | 8.62 ms | 0.009s | 718.7 ns/call |
+| nested_loops | 59 | 102.51 us | 28.48 ms | 0.028s | 142.42 us/call |
+| tail_recursive | 30 | 77.69 us | 8.35 ms | 0.008s | 20.9 ns/call |
+| array_sum | 35 | 54.28 us | 22.47 ms | 0.022s | 44.93 us/call |
+| gcd | 37 | 107.91 us | 17.60 ms | 0.018s | 22.0 ns/call |
+| dot_product | 40 | 102.86 us | 17.22 ms | 0.017s | 8.61 us/call |
+| nbody | 147 | 117.25 us | 177.56 ms | 0.178s | 177.558 ms/call |
+| matmul | 129 | 157.94 us | 267.27 ms | 0.262s | 133.635 ms/call |
+| saxpy | 38 | 85.28 us | 270.46 ms | 0.270s | 13.523 ms/call |
+| histogram | 32 | 92.35 us | 28.50 ms | 0.029s | 949.90 us/call |
+| histogram_big | 32 | 112.95 us | 68.40 ms | 0.068s | 22.801 ms/call |
+| fannkuch | 254 | 151.15 us | 438.17 ms | 0.438s | 219.087 ms/call |
+| queens | 199 | 114.96 us | 768.01 ms | 0.768s | 768.014 ms/call |
+| heapsort | 211 | 84.35 us | 14.35 ms | 0.014s | 358.71 us/call |
+| heapsort_big | 211 | 93.58 us | 25.01 ms | 0.025s | 25.014 ms/call |
+| strings | 150 | 71.03 us | 60.95 ms | 0.061s | 203.17 us/call |
+| nbody_float | 141 | 81.02 us | 125.09 ms | 0.125s | 41.697 ms/call |
 
 ### Windows x86-64 (windows-latest)
 
+(`bench` run `39070459914`, all green.)
+
 | example | bytes | assembled in | wall | cpu | per call |
 |---|---|---|---|---|---|
-| fib | 73 | 75.70 us | 15.45 ms | 0.015s | 30.9 ns/call |
-| loop_sum | 42 | 80.90 us | 32.74 ms | 0.033s | 327.43 us/call |
-| collatz | 80 | 91.80 us | 24.56 ms | 0.024s | 81.9 ns/call |
-| primes | 99 | 85.70 us | 30.21 ms | 0.030s | 503.5 ns/call |
-| mandel | 106 | 86.90 us | 27.56 ms | 0.027s | 137.8 ns/call |
-| sieve | 131 | 92.60 us | 5.22 ms | 0.006s | 104.5 ns/call |
-| bubble_sort | 95 | 80.00 us | 3.46 ms | 0.003s | 288.2 ns/call |
-| nested_loops | 59 | 115.20 us | 24.94 ms | 0.024s | 124.68 us/call |
-| tail_recursive | 30 | 77.20 us | 9.33 ms | 0.009s | 23.3 ns/call |
-| array_sum | 35 | 89.10 us | 18.42 ms | 0.018s | 36.84 us/call |
-| gcd | 37 | 79.10 us | 5.61 ms | 0.005s | 7.0 ns/call |
-| dot_product | 40 | 100.20 us | 11.17 ms | 0.011s | 5.59 us/call |
-| nbody | 147 | 90.50 us | 102.45 ms | 0.102s | 102.453 ms/call |
-| matmul | 129 | 92.40 us | 191.19 ms | 0.192s | 95.596 ms/call |
-| saxpy | 38 | 81.80 us | 69.34 ms | 0.069s | 3.467 ms/call |
-| histogram | 32 | 66.80 us | 10.40 ms | 0.010s | 346.53 us/call |
-| histogram_big | 32 | 83.90 us | 33.20 ms | 0.033s | 11.065 ms/call |
-| fannkuch | 254 | 129.10 us | 387.91 ms | 0.388s | 193.957 ms/call |
-| queens | 199 | 112.70 us | 657.27 ms | 0.657s | 657.272 ms/call |
-| heapsort | 211 | 117.40 us | 13.39 ms | 0.014s | 334.70 us/call |
-| heapsort_big | 211 | 91.40 us | 20.71 ms | 0.021s | 20.712 ms/call |
-| strings | 150 | 130.20 us | 45.47 ms | 0.045s | 151.57 us/call |
-| nbody_float | 154 | 136.50 us | 60.61 ms | 0.060s | 20.204 ms/call |
+| fib | 73 | 103.80 us | 11.21 ms | 0.011s | 22.4 ns/call |
+| loop_sum | 42 | 72.40 us | 37.48 ms | 0.037s | 374.79 us/call |
+| collatz | 80 | 136.10 us | 32.92 ms | 0.033s | 109.7 ns/call |
+| primes | 99 | 94.00 us | 30.17 ms | 0.030s | 502.9 ns/call |
+| mandel | 106 | 92.50 us | 28.27 ms | 0.028s | 141.3 ns/call |
+| sieve | 131 | 98.00 us | 5.81 ms | 0.005s | 116.2 ns/call |
+| bubble_sort | 95 | 89.00 us | 3.68 ms | 0.003s | 306.4 ns/call |
+| nested_loops | 59 | 88.00 us | 18.20 ms | 0.018s | 91.02 us/call |
+| tail_recursive | 30 | 88.50 us | 9.22 ms | 0.009s | 23.0 ns/call |
+| array_sum | 35 | 96.20 us | 18.35 ms | 0.018s | 36.69 us/call |
+| gcd | 37 | 88.50 us | 5.88 ms | 0.005s | 7.3 ns/call |
+| dot_product | 40 | 69.00 us | 11.25 ms | 0.011s | 5.62 us/call |
+| nbody | 147 | 150.70 us | 102.26 ms | 0.103s | 102.262 ms/call |
+| matmul | 129 | 106.40 us | 185.96 ms | 0.186s | 92.981 ms/call |
+| saxpy | 38 | 103.80 us | 73.94 ms | 0.074s | 3.697 ms/call |
+| histogram | 32 | 81.30 us | 11.38 ms | 0.012s | 379.39 us/call |
+| histogram_big | 32 | 101.80 us | 33.61 ms | 0.034s | 11.204 ms/call |
+| fannkuch | 254 | 144.20 us | 388.56 ms | 0.388s | 194.278 ms/call |
+| queens | 199 | 164.80 us | 647.82 ms | 0.648s | 647.819 ms/call |
+| heapsort | 211 | 171.80 us | 13.45 ms | 0.013s | 336.14 us/call |
+| heapsort_big | 211 | 145.50 us | 20.87 ms | 0.021s | 20.870 ms/call |
+| strings | 150 | 89.20 us | 46.68 ms | 0.047s | 155.58 us/call |
+| nbody_float | 154 | 130.50 us | 59.40 ms | 0.059s | 19.799 ms/call |
 
 ### Linux x86-64 (ubuntu-latest)
 
+(`bench` run `39070459914`, all green.)
+
 | example | bytes | assembled in | wall | cpu | per call |
 |---|---|---|---|---|---|
-| fib | 73 | 59.86 us | 11.03 ms | 0.011s | 22.1 ns/call |
-| loop_sum | 42 | 58.87 us | 33.48 ms | 0.033s | 334.79 us/call |
-| collatz | 80 | 64.09 us | 22.11 ms | 0.022s | 73.7 ns/call |
-| primes | 99 | 109.11 us | 24.65 ms | 0.025s | 410.8 ns/call |
-| mandel | 106 | 70.73 us | 27.65 ms | 0.028s | 138.3 ns/call |
-| sieve | 133 | 80.33 us | 5.53 ms | 0.006s | 110.5 ns/call |
-| bubble_sort | 95 | 62.89 us | 3.28 ms | 0.003s | 273.5 ns/call |
-| nested_loops | 59 | 61.54 us | 16.36 ms | 0.016s | 81.78 us/call |
-| tail_recursive | 30 | 58.94 us | 8.47 ms | 0.008s | 21.2 ns/call |
-| array_sum | 35 | 58.31 us | 16.71 ms | 0.017s | 33.42 us/call |
-| gcd | 37 | 65.25 us | 5.31 ms | 0.005s | 6.6 ns/call |
-| dot_product | 40 | 51.01 us | 10.55 ms | 0.011s | 5.28 us/call |
-| nbody | 147 | 78.07 us | 99.45 ms | 0.099s | 99.453 ms/call |
-| matmul | 129 | 101.55 us | 189.35 ms | 0.189s | 94.673 ms/call |
-| saxpy | 38 | 119.04 us | 71.70 ms | 0.072s | 3.585 ms/call |
-| histogram | 32 | 58.85 us | 10.55 ms | 0.011s | 351.68 us/call |
-| histogram_big | 32 | 74.94 us | 33.11 ms | 0.033s | 11.035 ms/call |
-| fannkuch | 254 | 135.85 us | 386.02 ms | 0.386s | 193.009 ms/call |
-| queens | 199 | 109.66 us | 634.31 ms | 0.634s | 634.314 ms/call |
-| heapsort | 211 | 77.70 us | 13.36 ms | 0.013s | 333.92 us/call |
-| heapsort_big | 211 | 96.04 us | 21.23 ms | 0.021s | 21.226 ms/call |
-| strings | 150 | 76.59 us | 44.12 ms | 0.044s | 147.08 us/call |
-| nbody_float | 141 | 77.22 us | 55.20 ms | 0.055s | 18.401 ms/call |
+| fib | 73 | 59.71 us | 10.99 ms | 0.011s | 22.0 ns/call |
+| loop_sum | 42 | 69.13 us | 33.71 ms | 0.034s | 337.11 us/call |
+| collatz | 80 | 86.61 us | 26.79 ms | 0.027s | 89.3 ns/call |
+| primes | 99 | 66.40 us | 23.45 ms | 0.023s | 390.8 ns/call |
+| mandel | 106 | 97.82 us | 27.64 ms | 0.028s | 138.2 ns/call |
+| sieve | 133 | 76.95 us | 4.82 ms | 0.005s | 96.5 ns/call |
+| bubble_sort | 95 | 64.81 us | 3.17 ms | 0.003s | 264.2 ns/call |
+| nested_loops | 59 | 61.98 us | 16.31 ms | 0.016s | 81.57 us/call |
+| tail_recursive | 30 | 56.01 us | 8.47 ms | 0.008s | 21.2 ns/call |
+| array_sum | 35 | 52.55 us | 16.95 ms | 0.017s | 33.89 us/call |
+| gcd | 37 | 56.34 us | 5.27 ms | 0.005s | 6.6 ns/call |
+| dot_product | 40 | 51.22 us | 10.55 ms | 0.011s | 5.27 us/call |
+| nbody | 147 | 72.42 us | 102.05 ms | 0.102s | 102.049 ms/call |
+| matmul | 129 | 100.27 us | 188.35 ms | 0.188s | 94.177 ms/call |
+| saxpy | 38 | 68.48 us | 69.34 ms | 0.069s | 3.467 ms/call |
+| histogram | 32 | 50.47 us | 10.39 ms | 0.010s | 346.22 us/call |
+| histogram_big | 32 | 76.73 us | 33.12 ms | 0.033s | 11.039 ms/call |
+| fannkuch | 254 | 123.15 us | 386.54 ms | 0.386s | 193.270 ms/call |
+| queens | 199 | 107.00 us | 635.16 ms | 0.635s | 635.159 ms/call |
+| heapsort | 211 | 73.47 us | 13.33 ms | 0.013s | 333.24 us/call |
+| heapsort_big | 211 | 59.88 us | 21.15 ms | 0.021s | 21.151 ms/call |
+| strings | 150 | 66.79 us | 44.83 ms | 0.045s | 149.42 us/call |
+| nbody_float | 141 | 80.97 us | 55.33 ms | 0.055s | 18.442 ms/call |
 
-### Windows ARM64 (windows-11-arm, native AArch64)
+### Windows ARM64 (windows-11-arm, x64 kernels under emulation)
 
-Native AArch64 table lands here from the next `bench` run. (The
-windows-11-arm job briefly ran x86-64 kernels under emulation: Nim
-defines `aarch64`, not `arm64`, on Windows ARM, so the first
-dual-arch cut missed it there. The arch gates now test both, matching
-`exec.nim`.)
+(`bench` run `39070459914`, all green.) Note the x64 byte sizes
+(fib 73, tail_recursive 30): neither `arm64` nor `aarch64` is defined
+for Nim on this runner, so it still selects the x64 kernels — treat
+these as emulated-x64 numbers, not AArch64:
+
+| example | bytes | assembled in | wall | cpu | per call |
+|---|---|---|---|---|---|
+| fib | 73 | 3.11 ms | 8.18 ms | 0.008s | 16.4 ns/call |
+| loop_sum | 42 | 3.02 ms | 35.10 ms | 0.035s | 350.98 us/call |
+| collatz | 80 | 3.37 ms | 24.56 ms | 0.024s | 81.9 ns/call |
+| primes | 99 | 3.51 ms | 35.30 ms | 0.036s | 588.3 ns/call |
+| mandel | 106 | 3.61 ms | 22.56 ms | 0.022s | 112.8 ns/call |
+| sieve | 131 | 3.78 ms | 5.29 ms | 0.006s | 105.8 ns/call |
+| bubble_sort | 95 | 3.56 ms | 6.56 ms | 0.007s | 546.4 ns/call |
+| nested_loops | 59 | 3.31 ms | 19.65 ms | 0.020s | 98.26 us/call |
+| tail_recursive | 30 | 3.16 ms | 8.45 ms | 0.008s | 21.1 ns/call |
+| array_sum | 35 | 3.00 ms | 20.30 ms | 0.020s | 40.59 us/call |
+| gcd | 37 | 3.19 ms | 6.13 ms | 0.006s | 7.7 ns/call |
+| dot_product | 40 | 2.92 ms | 13.40 ms | 0.014s | 6.70 us/call |
+| nbody | 147 | 3.86 ms | 1.298 s | 1.298s | 1298.208 ms/call |
+| matmul | 129 | 3.82 ms | 174.01 ms | 0.174s | 87.005 ms/call |
+| saxpy | 38 | 3.11 ms | 226.09 ms | 0.227s | 11.305 ms/call |
+| histogram | 32 | 2.78 ms | 160.91 ms | 0.161s | 5.364 ms/call |
+| histogram_big | 32 | 2.93 ms | 511.44 ms | 0.511s | 170.480 ms/call |
+| fannkuch | 254 | 4.11 ms | 1.228 s | 1.228s | 614.211 ms/call |
+| queens | 199 | 3.86 ms | 460.52 ms | 0.461s | 460.520 ms/call |
+| heapsort | 211 | 3.85 ms | 15.00 ms | 0.015s | 375.03 us/call |
+| heapsort_big | 211 | 3.98 ms | 21.95 ms | 0.022s | 21.945 ms/call |
+| strings | 150 | 3.67 ms | 167.79 ms | 0.168s | 559.29 us/call |
+| nbody_float | 154 | 3.84 ms | 43.42 ms | 0.043s | 14.474 ms/call |
 
 ### Linux ARM64 (ubuntu-24.04-arm, native AArch64)
 
-First native results (`bench` run `39030469883`, subset
-`array_sum heapsort nbody_float`, `iters=2`); the full 23-row table
-follows the next full-matrix run:
+Full 23-row native table (`bench` run `39070459914`, all green after
+the tail_recursive frame fix):
 
 | example | bytes | assembled in | wall | cpu | per call |
 |---|---|---|---|---|---|
-| array_sum | 40 | 45.62 us | 84.73 us | 0.000s | 42.37 us/call |
-| heapsort | 188 | 38.16 us | 3.30 ms | 0.003s | 206.21 us/call |
-| nbody_float | 168 | 48.99 us | 43.59 ms | 0.044s | 21.795 ms/call |
+| fib | 60 | 40.83 us | 6.37 ms | 0.006s | 12.7 ns/call |
+| loop_sum | 36 | 39.59 us | 29.61 ms | 0.030s | 296.08 us/call |
+| collatz | 60 | 39.23 us | 17.18 ms | 0.017s | 57.3 ns/call |
+| primes | 72 | 42.50 us | 12.86 ms | 0.013s | 214.3 ns/call |
+| mandel | 92 | 42.18 us | 20.97 ms | 0.021s | 104.8 ns/call |
+| sieve | 128 | 41.99 us | 3.82 ms | 0.004s | 76.3 ns/call |
+| bubble_sort | 72 | 58.28 us | 2.62 ms | 0.003s | 218.1 ns/call |
+| nested_loops | 60 | 38.38 us | 26.96 ms | 0.027s | 134.80 us/call |
+| tail_recursive | 40 | 56.20 us | 4.31 ms | 0.004s | 10.8 ns/call |
+| array_sum | 40 | 48.29 us | 20.03 ms | 0.020s | 40.06 us/call |
+| gcd | 32 | 37.74 us | 5.53 ms | 0.006s | 6.9 ns/call |
+| dot_product | 48 | 34.75 us | 9.37 ms | 0.009s | 4.68 us/call |
+| nbody | 204 | 40.84 us | 107.93 ms | 0.108s | 107.930 ms/call |
+| matmul | 116 | 78.68 us | 226.02 ms | 0.226s | 113.011 ms/call |
+| saxpy | 44 | 56.16 us | 70.47 ms | 0.070s | 3.524 ms/call |
+| histogram | 52 | 36.01 us | 19.04 ms | 0.019s | 634.67 us/call |
+| histogram_big | 52 | 61.71 us | 61.02 ms | 0.061s | 20.341 ms/call |
+| fannkuch | 228 | 56.75 us | 260.15 ms | 0.260s | 130.075 ms/call |
+| queens | 176 | 71.78 us | 415.58 ms | 0.416s | 415.581 ms/call |
+| heapsort | 188 | 41.89 us | 8.23 ms | 0.008s | 205.80 us/call |
+| heapsort_big | 188 | 49.98 us | 13.84 ms | 0.014s | 13.838 ms/call |
+| strings | 192 | 37.76 us | 44.77 ms | 0.045s | 149.23 us/call |
+| nbody_float | 168 | 46.52 us | 65.75 ms | 0.066s | 21.917 ms/call |
 
 ### macOS ARM64 (macos-15, native AArch64)
 
-First native results (`bench` run `39030469883`, subset
-`array_sum heapsort nbody_float`, `iters=2`); the full 23-row table
-follows the next full-matrix run:
+Full 23-row native table (`bench` run `39070459914`, all green after
+the tail_recursive frame fix):
 
 | example | bytes | assembled in | wall | cpu | per call |
 |---|---|---|---|---|---|
-| array_sum | 40 | 15.67 us | 73.88 us | 0.000s | 36.94 us/call |
-| heapsort | 188 | 30.00 us | 4.32 ms | 0.004s | 269.99 us/call |
-| nbody_float | 168 | 43.75 us | 79.96 ms | 0.080s | 39.979 ms/call |
+| fib | 60 | 24.12 us | 6.03 ms | 0.006s | 12.1 ns/call |
+| loop_sum | 36 | 25.62 us | 34.96 ms | 0.035s | 349.62 us/call |
+| collatz | 60 | 21.42 us | 24.08 ms | 0.024s | 80.3 ns/call |
+| primes | 72 | 25.42 us | 12.95 ms | 0.013s | 215.8 ns/call |
+| mandel | 92 | 21.88 us | 26.79 ms | 0.027s | 133.9 ns/call |
+| sieve | 128 | 110.12 us | 4.85 ms | 0.005s | 97.1 ns/call |
+| bubble_sort | 72 | 91.71 us | 3.38 ms | 0.003s | 281.4 ns/call |
+| nested_loops | 60 | 23.46 us | 25.80 ms | 0.025s | 129.00 us/call |
+| tail_recursive | 40 | 83.04 us | 5.02 ms | 0.005s | 12.5 ns/call |
+| array_sum | 40 | 18.96 us | 21.04 ms | 0.020s | 42.09 us/call |
+| gcd | 32 | 93.96 us | 2.84 ms | 0.003s | 3.6 ns/call |
+| dot_product | 48 | 18.42 us | 13.16 ms | 0.013s | 6.58 us/call |
+| nbody | 204 | 114.04 us | 116.80 ms | 0.115s | 116.796 ms/call |
+| matmul | 116 | 171.96 us | 166.86 ms | 0.150s | 83.428 ms/call |
+| saxpy | 44 | 42.00 us | 90.47 ms | 0.063s | 4.523 ms/call |
+| histogram | 52 | 22.54 us | 18.24 ms | 0.017s | 608.16 us/call |
+| histogram_big | 52 | 28.38 us | 56.53 ms | 0.056s | 18.843 ms/call |
+| fannkuch | 228 | 286.00 us | 337.11 ms | 0.337s | 168.556 ms/call |
+| queens | 176 | 313.29 us | 444.33 ms | 0.444s | 444.328 ms/call |
+| heapsort | 188 | 223.17 us | 11.56 ms | 0.012s | 288.98 us/call |
+| heapsort_big | 188 | 47.00 us | 15.99 ms | 0.016s | 15.992 ms/call |
+| strings | 192 | 29.92 us | 47.02 ms | 0.047s | 156.74 us/call |
+| nbody_float | 168 | 45.00 us | 115.93 ms | 0.116s | 38.643 ms/call |
 
 ## Roadmap
 - [x] Pure-Nim macro DSL assembler for x64 and x86
