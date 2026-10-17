@@ -1,0 +1,122 @@
+name: bench
+on:
+  push:
+    paths:
+      - 'examples/**'
+      - 'bench/**'
+      - 'src/**'
+      - '.github/workflows/bench.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Build mode'
+        default: 'release'
+        type: choice
+        options: [release, debug]
+      examples:
+        description: 'Space-separated example subset (empty = all)'
+        default: ''
+        required: false
+      iters:
+        description: 'BENCH_ITERS override (empty = per-example default)'
+        default: ''
+        required: false
+jobs:
+  bench:
+    # x86-64 only: the bundled examples emit x86-64 machine code and
+    # bench.sh refuses anything else (no macos-15 ARM runner here).
+    name: bench (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest}
+          - {os: windows-latest}
+          - {os: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: nimbase/setup-nim-action@main
+        with:
+          nim-version: stable
+
+      - name: Install clue
+        shell: bash
+        run: |
+          set -eu
+          os="${{ runner.os }}"
+          arch="${{ runner.arch }}"
+          case "${os}" in
+            Linux)
+              asset="clue_linux-x86_64"; ext="tar.gz"
+              ;;
+            macOS)
+              case "${arch}" in
+                X64)   asset="clue_macos-x86_64"; ext="tar.gz" ;;
+                ARM64) asset="clue_macos-arm64";  ext="tar.gz" ;;
+                *)     echo "ERROR: unsupported macOS arch: ${arch}"; exit 1 ;;
+              esac
+              ;;
+            Windows)
+              asset="clue_windows-x86_64"; ext="zip"
+              ;;
+            *)
+              echo "ERROR: unsupported os: ${os}"; exit 1
+              ;;
+          esac
+          url="https://github.com/openpeeps/clue/releases/latest/download/${asset}.${ext}"
+          echo ">> downloading ${url}"
+          work="$(mktemp -d)"
+          trap 'rm -rf "${work}"' EXIT
+          curl -fsSL "${url}" -o "${work}/clue.${ext}"
+          if [[ "${ext}" == "zip" ]]; then
+            win_zip="$(cygpath -w "${work}/clue.zip")"
+            win_dest="$(cygpath -w "${work}")"
+            powershell -NoProfile -Command "Expand-Archive -Force -LiteralPath '${win_zip}' -DestinationPath '${win_dest}'"
+          else
+            tar xzf "${work}/clue.${ext}" -C "${work}"
+          fi
+          bin="$(find "${work}" -type f \( -name 'clue' -o -name 'clue.exe' \) | head -n 1)"
+          [[ -n "${bin}" ]] || { echo "ERROR: clue binary not found in archive"; exit 1; }
+          chmod +x "${bin}"
+          mkdir -p "$HOME/.clue/bin"
+          target="$HOME/.clue/bin/clue"
+          if [[ "${os}" == "Windows" ]]; then
+            target="${target}.exe"
+          fi
+          install -m 0755 "${bin}" "${target}"
+          if [[ "${os}" == "Windows" ]]; then
+            win_path="$(cygpath -w "$HOME/.clue/bin")"
+            echo "$win_path" >> "$GITHUB_PATH"
+          else
+            echo "$HOME/.clue/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Install dependencies
+        shell: bash
+        run: clue install --depsOnly
+
+      - name: Run benches
+        shell: bash
+        env:
+          MODE: ${{ inputs.mode }}
+          BENCH_ITERS: ${{ inputs.iters }}
+        run: |
+          if [[ -n "${{ inputs.examples }}" ]]; then
+            # shellcheck disable=SC2086
+            bash examples/bench.sh ${{ inputs.examples }}
+          else
+            bash examples/bench.sh
+          fi
+
+      - name: Print Markdown table
+        shell: bash
+        run: cat bench/results/SUMMARY.md
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.os }}
+          path: bench/results/
