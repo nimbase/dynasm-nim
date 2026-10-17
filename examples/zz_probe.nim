@@ -22,7 +22,7 @@ proc buildIter*(): ExecutableBuffer =
     arch aarch64
     alias n, x0
     alias acc, x1
-    mov x9, xzr
+    mov x9, 1 # total starts at 1: this is a product loop
     mov x10, 1
     label loop
     cmp x10, n
