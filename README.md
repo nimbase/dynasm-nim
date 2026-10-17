@@ -45,9 +45,10 @@ then hammers its hot loop and prints wall/cpu/per-call throughput.
 Generated with `./examples/bench.sh` (release builds); rerun per
 platform from the `bench` workflow (push paths + manual dispatch with
 mode/examples/iters inputs). Each example emits native code for its
-host (`when defined(arm64)` selects the AArch64 kernel, otherwise the
-x64 one), so every platform in the matrix executes natively with no
-emulation. The x64 kernels run on System V and Win64 alike (argument
+host (`when defined(arm64) or defined(aarch64)` selects the AArch64
+kernel, otherwise the x64 one — both spellings are needed since Nim
+defines `aarch64`, not `arm64`, on Windows ARM), so every platform in
+the matrix executes natively with no emulation. The x64 kernels run on System V and Win64 alike (argument
 registers selected per ABI via `alias`); the AArch64 kernels follow
 AAPCS64 on all three OSes.
 
@@ -137,20 +138,35 @@ AAPCS64 on all three OSes.
 
 ### Windows ARM64 (windows-11-arm, native AArch64)
 
-Native AArch64 table lands here from the first post-merge `bench`
-run (per-OS `SUMMARY.md` artifacts). The numbers previously in this
-spot measured x86-64 code under emulation and were retired with the
-dual-arch port.
+Native AArch64 table lands here from the next `bench` run. (The
+windows-11-arm job briefly ran x86-64 kernels under emulation: Nim
+defines `aarch64`, not `arm64`, on Windows ARM, so the first
+dual-arch cut missed it there. The arch gates now test both, matching
+`exec.nim`.)
 
 ### Linux ARM64 (ubuntu-24.04-arm, native AArch64)
 
-Native AArch64 table lands here from the first post-merge `bench`
-run (per-OS `SUMMARY.md` artifacts).
+First native results (`bench` run `39030469883`, subset
+`array_sum heapsort nbody_float`, `iters=2`); the full 23-row table
+follows the next full-matrix run:
+
+| example | bytes | assembled in | wall | cpu | per call |
+|---|---|---|---|---|---|
+| array_sum | 40 | 45.62 us | 84.73 us | 0.000s | 42.37 us/call |
+| heapsort | 188 | 38.16 us | 3.30 ms | 0.003s | 206.21 us/call |
+| nbody_float | 168 | 48.99 us | 43.59 ms | 0.044s | 21.795 ms/call |
 
 ### macOS ARM64 (macos-15, native AArch64)
 
-Native AArch64 table lands here from the first post-merge `bench`
-run (per-OS `SUMMARY.md` artifacts).
+First native results (`bench` run `39030469883`, subset
+`array_sum heapsort nbody_float`, `iters=2`); the full 23-row table
+follows the next full-matrix run:
+
+| example | bytes | assembled in | wall | cpu | per call |
+|---|---|---|---|---|---|
+| array_sum | 40 | 15.67 us | 73.88 us | 0.000s | 36.94 us/call |
+| heapsort | 188 | 30.00 us | 4.32 ms | 0.004s | 269.99 us/call |
+| nbody_float | 168 | 43.75 us | 79.96 ms | 0.080s | 39.979 ms/call |
 
 ## Roadmap
 - [x] Pure-Nim macro DSL assembler for x64 and x86

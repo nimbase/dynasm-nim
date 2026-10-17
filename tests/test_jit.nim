@@ -37,7 +37,7 @@ when defined(amd64):
     check f() == 5
     buf.destroy()
 
-when defined(arm64):
+when defined(arm64) or defined(aarch64):
   test "aarch64 jit movz/ret returns immediate":
     var a = newAssembler(akAarch64)
     dynasm a:

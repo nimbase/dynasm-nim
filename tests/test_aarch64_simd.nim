@@ -206,7 +206,7 @@ test "aarch64 float immediate helpers":
   check encodeStretchedImm(0x00FF00FFFF00FF00'u64) == 0x5A
   check encodeStretchedImm(0x123456789ABCDEF'u64) < 0
 
-when defined(arm64):
+when defined(arm64) or defined(aarch64):
   # Execution test: runs by default on AArch64 hardware with no
   # extra packages. The oracle is a plain scalar loop — every lane
   # is one correctly-rounded float32 addition, and the chosen inputs

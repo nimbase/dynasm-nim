@@ -30,7 +30,7 @@ type
     integrate: pointer) {.cdecl.}
 
 proc buildNbodyFloat*(): ExecutableBuffer =
-  when defined(arm64):
+  when defined(arm64) or defined(aarch64):
     var a = newAssembler(akAarch64)
     dynasm a:
       arch aarch64

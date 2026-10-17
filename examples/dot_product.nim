@@ -13,7 +13,7 @@ import benchutil
 type DotFn = proc(a, b: pointer, n: int64): int64 {.cdecl.}
 
 proc buildDot*(): ExecutableBuffer =
-  when defined(arm64):
+  when defined(arm64) or defined(aarch64):
     var a = newAssembler(akAarch64)
     dynasm a:
       arch aarch64

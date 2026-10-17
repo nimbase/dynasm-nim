@@ -19,7 +19,7 @@ type NbodyFn = proc(state: pointer, steps: int64) {.cdecl.}
 const Bodies = 5
 
 proc buildNbody*(): ExecutableBuffer =
-  when defined(arm64):
+  when defined(arm64) or defined(aarch64):
     var a = newAssembler(akAarch64)
     dynasm a:
       arch aarch64

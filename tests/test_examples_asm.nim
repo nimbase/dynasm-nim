@@ -72,7 +72,7 @@ proc armGolden(name: string): int =
   else: -1
 
 proc checkAsm(name: string, b: var ExecutableBuffer) =
-  when defined(arm64):
+  when defined(arm64) or defined(aarch64):
     check b.len == armGolden(name)
   else:
     check b.len > 0

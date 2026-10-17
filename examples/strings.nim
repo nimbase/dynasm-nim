@@ -23,7 +23,7 @@ const N = 65_536
 
 proc buildStrings*(): tuple[buf: ExecutableBuffer, strlen, strcmp,
     strcpy, strhash: AssemblyOffset] =
-  when defined(arm64):
+  when defined(arm64) or defined(aarch64):
     var a = newAssembler(akAarch64)
     let oStrlen = a.offset()
     dynasm a:

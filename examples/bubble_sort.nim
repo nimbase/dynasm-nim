@@ -15,7 +15,7 @@ import std/random
 type BsortFn = proc(arr: pointer, n: int64) {.cdecl.}
 
 proc buildBsort*(): ExecutableBuffer =
-  when defined(arm64):
+  when defined(arm64) or defined(aarch64):
     var a = newAssembler(akAarch64)
     dynasm a:
       arch aarch64
