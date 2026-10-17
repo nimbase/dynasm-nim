@@ -16,17 +16,17 @@ proc buildAsum(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
-    alias arr, rdi
-    alias n, rsi
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias arr, rdi, rcx
+    alias n, rsi, rdx
     `xor` r8, r8 # total
-    `xor` ecx, ecx # i
+    `xor` r10d, r10d # i (r10: scratch on both ABIs; RCX holds an arg on Win64)
     label loop
-    cmp rcx, n
+    cmp r10, n
     jge fwd("done")
-    mov rax, [arr + rcx*8]
+    mov rax, [arr + r10*8]
     add r8, rax
-    add rcx, 1
+    add r10, 1
     jmp bwd("loop")
     label done
     mov rax, r8

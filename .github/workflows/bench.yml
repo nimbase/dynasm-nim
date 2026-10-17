@@ -23,8 +23,8 @@ on:
         required: false
 jobs:
   bench:
-    # x86-64 only: the bundled examples emit x86-64 machine code and
-    # bench.sh refuses anything else (no macos-15 ARM runner here).
+    # The bundled examples emit x86-64 machine code: amd64 runners run
+    # the full bench, ARM runners build-only (no execution possible).
     name: bench (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
@@ -32,9 +32,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-latest}
-          - {os: windows-latest}
-          - {os: macos-15-intel}
+          - {os: ubuntu-latest, arch: amd64}
+          - {os: windows-latest, arch: amd64}
+          - {os: macos-15-intel, arch: amd64}
+          - {os: ubuntu-24.04-arm, arch: arm64}
+          - {os: windows-11-arm, arch: arm64}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +44,10 @@ jobs:
         with:
           nim-version: stable
 
+      # No clue binary ships for ARM Linux/Windows: those jobs use
+      # the plain-nim fallback in bench.sh (examples need no deps).
       - name: Install clue
+        if: matrix.arch != 'arm64'
         shell: bash
         run: |
           set -eu
@@ -95,6 +100,7 @@ jobs:
           fi
 
       - name: Install dependencies
+        if: matrix.arch != 'arm64'
         shell: bash
         run: clue install --depsOnly
 

@@ -16,22 +16,22 @@ proc buildDot(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI, RDX (use RCX, RDX, R8 on Windows).
-    alias xs, rdi
-    alias ys, rsi
-    alias n, rdx
-    `xor` r8, r8 # acc
-    `xor` ecx, ecx # i
+    # Args: first slots (System V: RDI, RSI, RDX / Win64: RCX, RDX, R8).
+    alias xs, rdi, rcx
+    alias ys, rsi, rdx
+    alias n, rdx, r8
+    `xor` r10, r10 # acc (r10: scratch on both ABIs)
+    `xor` r11d, r11d # i (r11: scratch on both ABIs)
     label loop
-    cmp rcx, n
+    cmp r11, n
     jge fwd("done")
-    mov rax, [xs + rcx*8]
-    imul rax, [ys + rcx*8]
-    add r8, rax
-    add rcx, 1
+    mov rax, [xs + r11*8]
+    imul rax, [ys + r11*8]
+    add r10, rax
+    add r11, 1
     jmp bwd("loop")
     label done
-    mov rax, r8
+    mov rax, r10
     ret()
   a.finalize()
 

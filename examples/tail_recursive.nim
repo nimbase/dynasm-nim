@@ -17,9 +17,9 @@ proc buildFact(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
-    alias n, rdi
-    alias acc, rsi
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias n, rdi, rcx
+    alias acc, rsi, rdx
     label fact
     cmp n, 1
     jle fwd("base")

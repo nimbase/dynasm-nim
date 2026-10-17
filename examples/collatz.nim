@@ -17,10 +17,10 @@ proc buildSteps(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: first arg arrives in RDI (use RCX on Windows x64).
-    alias n, rdi
+    # Args: first slot (System V: RDI / Win64: RCX).
+    alias n, rdi, rcx
     mov rax, n
-    mov rcx, 0
+    mov r10, 0 # steps (r10: scratch on both ABIs)
     label loop
     cmp rax, 1
     je fwd("done")
@@ -29,17 +29,17 @@ proc buildSteps(): ExecutableBuffer =
     cmp rdx, 0
     jne fwd("odd")
     `shr` rax, 1
-    add rcx, 1
+    add r10, 1
     jmp bwd("loop")
     label odd
     mov rdx, rax
     `shl` rdx, 1
     add rax, rdx
     add rax, 1
-    add rcx, 1
+    add r10, 1
     jmp bwd("loop")
     label done
-    mov rax, rcx
+    mov rax, r10
     ret()
   a.finalize()
 

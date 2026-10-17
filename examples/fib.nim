@@ -17,22 +17,22 @@ proc buildFib(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: first arg arrives in RDI (use RCX on Windows x64).
-    alias n, rdi
+    # Args: first slot (System V: RDI / Win64: RCX).
+    alias n, rdi, rcx
     mov r8, n
     cmp r8, 1
     jle fwd("base")
     # fib(0) = 0, fib(1) = 1, else iterate a=0, b=1
-    mov rcx, 0
-    mov rdx, 1
-    mov rsi, 2
+    mov r11, 0 # a (r11: scratch on both ABIs)
+    mov rdx, 1 # b
+    mov r10, 2 # i (r10: scratch on both ABIs; RSI is non-volatile on Win64)
     label loop
-    mov rax, rcx
+    mov rax, r11
     add rax, rdx
-    mov rcx, rdx
+    mov r11, rdx
     mov rdx, rax
-    add rsi, 1
-    cmp rsi, r8
+    add r10, 1
+    cmp r10, r8
     jle bwd("loop")
     ret()
     label base

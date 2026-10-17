@@ -18,8 +18,8 @@ proc buildHsort(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    alias arr, rdi
-    alias n, rsi
+    alias arr, rdi, rcx
+    alias n, rsi, rdx
     mov r9, n
     `shr` r9, 1
     sub r9, 1
@@ -39,8 +39,8 @@ proc buildHsort(): ExecutableBuffer =
     cmp r9, 1
     jl fwd("done")
     mov rax, [arr]
-    mov rcx, [arr + r9*8]
-    mov [arr], rcx
+    mov r8, [arr + r9*8]
+    mov [arr], r8
     mov [arr + r9*8], rax
     mov r10, 0
     mov r11, r9
@@ -58,22 +58,22 @@ proc buildHsort(): ExecutableBuffer =
     add rax, 1
     cmp rax, r11
     jge fwd("siftdone")
-    mov rcx, rax
-    add rcx, 1
-    cmp rcx, r11
+    mov r8, rax
+    add r8, 1
+    cmp r8, r11
     jge fwd("noright")
     mov rdx, [arr + rax*8]
-    cmp rdx, [arr + rcx*8]
+    cmp rdx, [arr + r8*8]
     jge fwd("noright")
-    mov rax, rcx
+    mov rax, r8
     label noright
     mov rdx, [arr + r10*8]
     cmp rdx, [arr + rax*8]
     jge fwd("siftdone")
-    mov rcx, [arr + r10*8]
+    mov r8, [arr + r10*8]
     mov rdx, [arr + rax*8]
     mov [arr + r10*8], rdx
-    mov [arr + rax*8], rcx
+    mov [arr + rax*8], r8
     mov r10, rax
     jmp bwd("siftloop")
     label siftdone

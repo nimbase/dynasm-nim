@@ -20,17 +20,17 @@ proc buildHist(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI, RDX.
-    alias data, rdi
-    alias n, rsi
-    alias bins, rdx
-    `xor` ecx, ecx # i
+    # Args: first slots (System V: RDI, RSI, RDX / Win64: RCX, RDX, R8).
+    alias data, rdi, rcx
+    alias n, rsi, rdx
+    alias bins, rdx, r8
+    `xor` r9d, r9d # i (r9: scratch on both ABIs)
     label loop
-    cmp rcx, n
+    cmp r9, n
     jge fwd("done")
-    movzx eax, byte [data + rcx*1]
+    movzx eax, byte [data + r9*1]
     add qword [bins + rax*8], 1
-    add rcx, 1
+    add r9, 1
     jmp bwd("loop")
     label done
     ret()

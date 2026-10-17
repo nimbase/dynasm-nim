@@ -19,40 +19,43 @@ proc buildQueens(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI.
-    alias cols, rdi
-    alias n, rsi
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias cols, rdi, rcx
+    alias n, rsi, rdx
+    # R12 (row) and R13 (t) are callee-saved on both ABIs: preserve.
+    push r12
+    push r13
     # cols[i] = -1; count = 0; row = 0
-    `xor` ecx, ecx
+    `xor` r12d, r12d
     label init
-    cmp rcx, n
+    cmp r12, n
     jge fwd("search")
-    mov qword [cols + rcx*8], -1
-    add rcx, 1
+    mov qword [cols + r12*8], -1
+    add r12, 1
     jmp bwd("init")
     label search
     `xor` r8, r8 # count
-    `xor` ecx, ecx # row
+    `xor` r12d, r12d # row
     label trycol
-    mov r9, [cols + rcx*8] # col = last tried + 1
+    mov r9, [cols + r12*8] # col = last tried + 1
     add r9, 1
     label retest
     cmp r9, n
     jge fwd("backtrack")
     `xor` r10, r10 # r = 0
     label check
-    cmp r10, rcx
+    cmp r10, r12
     jge fwd("place")
     mov rax, [cols + r10*8] # cols[r]
     mov r11, r9
     sub r11, rax # d = col - cols[r]
     je fwd("conflict")
-    mov rdx, rcx
-    sub rdx, r10 # t = row - r (> 0)
-    cmp rdx, r11
+    mov r13, r12
+    sub r13, r10 # t = row - r (> 0)
+    cmp r13, r11
     je fwd("conflict")
     neg r11 # -d
-    cmp rdx, r11
+    cmp r13, r11
     je fwd("conflict")
     add r10, 1
     jmp bwd("check")
@@ -60,23 +63,25 @@ proc buildQueens(): ExecutableBuffer =
     add r9, 1
     jmp bwd("retest")
     label place
-    mov [cols + rcx*8], r9
-    add rcx, 1 # row++
-    cmp rcx, n
+    mov [cols + r12*8], r9
+    add r12, 1 # row++
+    cmp r12, n
     jge fwd("found")
     jmp bwd("trycol")
     label found
     add r8, 1
-    sub rcx, 1 # step back, trycol resumes after cols[n-1]
+    sub r12, 1 # step back, trycol resumes after cols[n-1]
     jmp bwd("trycol")
     label backtrack
-    mov qword [cols + rcx*8], -1
-    cmp rcx, 0
+    mov qword [cols + r12*8], -1
+    cmp r12, 0
     je fwd("done")
-    sub rcx, 1
+    sub r12, 1
     jmp bwd("trycol")
     label done
     mov rax, r8
+    pop r13
+    pop r12
     ret()
   a.finalize()
 

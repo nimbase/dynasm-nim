@@ -17,17 +17,20 @@ proc buildGcd(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
-    alias u, rdi
-    alias v, rsi
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias u, rdi, rcx
+    alias v0, rsi, rdx
+    # v lives in R10: div needs RDX as scratch, and RDX carries an
+    # arg on Win64. R10 is scratch on both ABIs.
+    mov r10, v0
     label loop
-    cmp v, 0
+    cmp r10, 0
     je fwd("done")
     mov rax, u
     `xor` rdx, rdx
-    `div` v
-    mov u, v
-    mov v, rdx
+    `div` r10
+    mov u, r10
+    mov r10, rdx
     jmp bwd("loop")
     label done
     mov rax, u

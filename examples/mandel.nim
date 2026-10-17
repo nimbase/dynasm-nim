@@ -22,9 +22,11 @@ proc buildMandel(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
-    alias a1, rdi
-    alias a2, rsi
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias a1, rdi, rcx
+    alias a2, rsi, rdx
+    # RSI is scratch below but non-volatile on Win64: preserve it.
+    push rsi
     # r8 = cx, r9 = cy, r10 = x, r11 = y, rcx = iter
     mov r8, a1
     mov r9, a2
@@ -60,6 +62,7 @@ proc buildMandel(): ExecutableBuffer =
     jmp bwd("loop")
     label done
     mov rax, rcx
+    pop rsi
     ret()
   a.finalize()
 

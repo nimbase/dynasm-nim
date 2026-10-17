@@ -28,9 +28,11 @@ proc buildStrings(): tuple[buf: ExecutableBuffer, strlen, strcmp,
   dynasm a:
     arch x64
     global strlenFn
+    # Args: first slot (System V: RDI / Win64: RCX).
+    alias s, rdi, rcx
     `xor` eax, eax
     label slen
-    cmp byte [rdi + rax*1], 0
+    cmp byte [s + rax*1], 0
     je fwd("slend")
     add rax, 1
     jmp bwd("slen")
@@ -40,15 +42,18 @@ proc buildStrings(): tuple[buf: ExecutableBuffer, strlen, strcmp,
   dynasm a:
     arch x64
     global strcmpFn
-    `xor` ecx, ecx
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias sa, rdi, rcx
+    alias sb, rsi, rdx
+    `xor` r10d, r10d # i (r10: scratch on both ABIs)
     label scmp
-    movzx rax, byte [rdi + rcx*1]
-    movzx rdx, byte [rsi + rcx*1]
-    sub rax, rdx
+    movzx rax, byte [sa + r10*1]
+    movzx r8, byte [sb + r10*1]
+    sub rax, r8
     jne fwd("scmpd")
-    cmp dl, 0 # equal so far: terminator?
+    cmp r8b, 0 # equal so far: terminator?
     je fwd("scmpeq")
-    add rcx, 1
+    add r10, 1
     jmp bwd("scmp")
     label scmpeq
     `xor` eax, eax
@@ -59,30 +64,36 @@ proc buildStrings(): tuple[buf: ExecutableBuffer, strlen, strcmp,
   dynasm a:
     arch x64
     global strcpyFn
-    `xor` ecx, ecx
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias dd, rdi, rcx
+    alias ss, rsi, rdx
+    `xor` r10d, r10d # i (r10: scratch on both ABIs)
     label scpy
-    movzx eax, byte [rsi + rcx*1]
-    mov byte [rdi + rcx*1], al
-    add rcx, 1
+    movzx eax, byte [ss + r10*1]
+    mov byte [dd + r10*1], al
+    add r10, 1
     cmp eax, 0
     jne bwd("scpy")
-    mov rax, rcx
+    mov rax, r10
     ret()
   let oStrhash = a.offset()
   dynasm a:
     arch x64
     global strhashFn
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias hs, rdi, rcx
+    alias hn, rsi, rdx
     # FNV-1a offset basis as signed int64 (same bit pattern)
     mov rax, -3750763034362895579
     mov r11, 1099511628211
-    `xor` ecx, ecx
+    `xor` r10d, r10d # i (r10: scratch on both ABIs)
     label shash
-    cmp rcx, rsi
+    cmp r10, hn
     jge fwd("shashd")
-    movzx edx, byte [rdi + rcx*1]
-    `xor` rax, rdx
+    movzx r8d, byte [hs + r10*1]
+    `xor` rax, r8
     imul rax, r11
-    add rcx, 1
+    add r10, 1
     jmp bwd("shash")
     label shashd
     ret()

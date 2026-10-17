@@ -18,16 +18,16 @@ proc buildSieve(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
-    alias buf, rdi
-    alias n, rsi
-    # fill buf[0..n) with 1
-    `xor` ecx, ecx
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias buf, rdi, rcx
+    alias n, rsi, rdx
+    # fill buf[0..n) with 1 (i/j in R10/R11: scratch on both ABIs)
+    `xor` r10d, r10d
     label fill
-    cmp rcx, n
+    cmp r10, n
     jge fwd("start")
-    mov byte [buf + rcx*1], 1
-    add rcx, 1
+    mov byte [buf + r10*1], 1
+    add r10, 1
     jmp bwd("fill")
     label start
     cmp n, 0
@@ -36,28 +36,28 @@ proc buildSieve(): ExecutableBuffer =
     cmp n, 1
     jle fwd("done")
     mov byte [buf + 1], 0
-    mov rcx, 2
+    mov r10, 2
     label outer
-    # if rcx*rcx >= n, we are done
-    mov rax, rcx
-    imul rax, rcx
+    # if r10*r10 >= n, we are done
+    mov rax, r10
+    imul rax, r10
     cmp rax, n
     jge fwd("done")
     # skip composites
-    movzx eax, byte [buf + rcx*1]
+    movzx eax, byte [buf + r10*1]
     cmp eax, 0
     je fwd("next")
-    # mark j = 2*rcx, 3*rcx, ... as 0
-    mov rdx, rcx
-    add rdx, rcx
+    # mark j = 2*r10, 3*r10, ... as 0
+    mov r11, r10
+    add r11, r10
     label mark
-    cmp rdx, n
+    cmp r11, n
     jge fwd("next")
-    mov byte [buf + rdx*1], 0
-    add rdx, rcx
+    mov byte [buf + r11*1], 0
+    add r11, r10
     jmp bwd("mark")
     label next
-    add rcx, 1
+    add r10, 1
     jmp bwd("outer")
     label done
     ret()

@@ -15,15 +15,15 @@ proc buildSum(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: first arg arrives in RDI (use RCX on Windows x64).
-    alias n, rdi
+    # Args: first slot (System V: RDI / Win64: RCX).
+    alias n, rdi, rcx
     mov rax, 0
-    mov rcx, 1
+    mov r10, 1 # i (r10: scratch on both ABIs)
     label loop
-    cmp rcx, n
+    cmp r10, n
     jg fwd("done")
-    add rax, rcx
-    add rcx, 1
+    add rax, r10
+    add r10, 1
     jmp bwd("loop")
     label done
     ret()

@@ -17,8 +17,8 @@ proc buildIsPrime(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: first arg arrives in RDI (use RCX on Windows x64).
-    alias n, rdi
+    # Args: first slot (System V: RDI / Win64: RCX).
+    alias n, rdi, rcx
     mov r8, n
     cmp r8, 2
     jl fwd("no")

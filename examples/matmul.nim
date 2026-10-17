@@ -20,51 +20,56 @@ proc buildMatmul(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI, RDX, RCX.
-    alias aa, rdi
-    alias bb, rsi
-    alias cc, rdx
-    alias n, rcx
+    # Args: first slots (System V: RDI, RSI, RDX, RCX / Win64: RCX, RDX, R8, R9).
+    alias aa, rdi, rcx
+    alias bb, rsi, rdx
+    alias cc, rdx, r8
+    alias n, rcx, r9
     push r12
     push r13
-    `xor` r8, r8 # i
+    push r14
+    # i in R11, j/k in R10, aOff in R14: R11/R10 are scratch on both
+    # ABIs, R14 is callee-saved (pushed). R8/R9 held i/j before but
+    # carry args on Win64, so every home moves.
+    `xor` r11, r11 # i
     label outer
-    cmp r8, n
+    cmp r11, n
     jge fwd("done")
-    `xor` r9, r9 # j
+    `xor` r10, r10 # j
     label mid
-    cmp r9, n
+    cmp r10, n
     jge fwd("nexti")
-    mov r10, r8
-    imul r10, n # i*n
-    mov rax, r10
-    add rax, r9 # i*n+j
+    mov r14, r11
+    imul r14, n # aOff = i*n
+    mov rax, r14
+    add rax, r10 # i*n+j
     lea rax, [cc + rax*8] # &C[i,j]
     push rax # spill cell address
-    push r9 # spill j
-    mov r13, r9 # bOff = j
-    `xor` r9, r9 # k = 0 (j dead from here)
-    `xor` r12, r12 # acc = 0 (r10 = aOff = i*n still holds)
+    push r10 # spill j
+    mov r13, r10 # bOff = j
+    `xor` r10, r10 # k = 0 (j dead from here)
+    `xor` r12, r12 # acc = 0
     label inner
-    cmp r9, n
+    cmp r10, n
     jge fwd("endinner")
-    mov rax, [aa + r10*8]
+    mov rax, [aa + r14*8]
     imul rax, [bb + r13*8]
     add r12, rax
-    add r10, 1
+    add r14, 1
     add r13, n
-    add r9, 1
+    add r10, 1
     jmp bwd("inner")
     label endinner
-    pop r9 # j
+    pop r10 # j
     pop r13 # cell address
     mov [r13], r12
-    add r9, 1 # j++
+    add r10, 1 # j++
     jmp bwd("mid")
     label nexti
-    add r8, 1 # i++
+    add r11, 1 # i++
     jmp bwd("outer")
     label done
+    pop r14
     pop r13
     pop r12
     ret()

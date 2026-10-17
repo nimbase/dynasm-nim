@@ -9,7 +9,9 @@
 # integrate callback per step. Loop state that must survive calls
 # lives in callee-saved registers (pushed once at entry); the inner
 # counter J lives in a 16-byte stack slot. Five pushes plus the slot
-# keep RSP 16-byte aligned at every `call` (SysV requirement).
+# keep RSP 16-byte aligned at every `call`. On Win64 the callbacks
+# additionally need 32 bytes of shadow space and RCX/RDX/R8 args,
+# so the Windows block below mirrors the SysV one with that layout.
 
 import dynasm
 import benchutil
@@ -27,56 +29,112 @@ type
 
 proc buildNbodyFloat(): ExecutableBuffer =
   var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    push rbx
-    push r12
-    push r13
-    push r14
-    push r15
-    sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
-    mov rbx, rdi # bodies
-    mov r12, rsi # steps left
-    mov r13, rdx # interact fn
-    mov r14, rcx # integrate fn
-    label step
-    cmp r12, 0
-    je fwd("done")
-    `xor` r15, r15 # i = 0
-    label outer
-    cmp r15, 5
-    jge fwd("integrate")
-    mov rax, r15
-    add rax, 1
-    mov [rsp], rax # j = i+1
-    label inner
-    mov rax, [rsp]
-    cmp rax, 5
-    jge fwd("nexti")
-    mov rdi, rbx
-    mov rsi, r15
-    mov rdx, [rsp]
-    call r13
-    mov rax, [rsp]
-    add rax, 1
-    mov [rsp], rax
-    jmp bwd("inner")
-    label nexti
-    add r15, 1
-    jmp bwd("outer")
-    label integrate
-    mov rdi, rbx
-    call r14
-    sub r12, 1
-    jmp bwd("step")
-    label done
-    add rsp, 16
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbx
-    ret()
+  when defined(windows):
+    dynasm a:
+      arch x64
+      # Win64: args arrive in RCX, RDX, R8, R9; callbacks take
+      # RCX/RDX/R8 and require 32 bytes of shadow space above RSP.
+      push rbx
+      push r12
+      push r13
+      push r14
+      push r15
+      sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
+      sub rsp, 32 # shadow space for the callback calls
+      mov rbx, rcx # bodies
+      mov r12, rdx # steps left
+      mov r13, r8 # interact fn
+      mov r14, r9 # integrate fn
+      label step
+      cmp r12, 0
+      je fwd("done")
+      `xor` r15, r15 # i = 0
+      label outer
+      cmp r15, 5
+      jge fwd("integrate")
+      mov rax, r15
+      add rax, 1
+      mov [rsp + 32], rax # j = i+1 (past the shadow space)
+      label inner
+      mov rax, [rsp + 32]
+      cmp rax, 5
+      jge fwd("nexti")
+      mov rcx, rbx
+      mov rdx, r15
+      mov r8, [rsp + 32]
+      call r13
+      mov rax, [rsp + 32]
+      add rax, 1
+      mov [rsp + 32], rax
+      jmp bwd("inner")
+      label nexti
+      add r15, 1
+      jmp bwd("outer")
+      label integrate
+      mov rcx, rbx
+      call r14
+      sub r12, 1
+      jmp bwd("step")
+      label done
+      add rsp, 32
+      add rsp, 16
+      pop r15
+      pop r14
+      pop r13
+      pop r12
+      pop rbx
+      ret()
+  else:
+    dynasm a:
+      arch x64
+      push rbx
+      push r12
+      push r13
+      push r14
+      push r15
+      sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
+      mov rbx, rdi # bodies
+      mov r12, rsi # steps left
+      mov r13, rdx # interact fn
+      mov r14, rcx # integrate fn
+      label step
+      cmp r12, 0
+      je fwd("done")
+      `xor` r15, r15 # i = 0
+      label outer
+      cmp r15, 5
+      jge fwd("integrate")
+      mov rax, r15
+      add rax, 1
+      mov [rsp], rax # j = i+1
+      label inner
+      mov rax, [rsp]
+      cmp rax, 5
+      jge fwd("nexti")
+      mov rdi, rbx
+      mov rsi, r15
+      mov rdx, [rsp]
+      call r13
+      mov rax, [rsp]
+      add rax, 1
+      mov [rsp], rax
+      jmp bwd("inner")
+      label nexti
+      add r15, 1
+      jmp bwd("outer")
+      label integrate
+      mov rdi, rbx
+      call r14
+      sub r12, 1
+      jmp bwd("step")
+      label done
+      add rsp, 16
+      pop r15
+      pop r14
+      pop r13
+      pop r12
+      pop rbx
+      ret()
   a.finalize()
 
 proc interact(bodies: pointer, i, j: int64) {.cdecl.} =

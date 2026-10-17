@@ -18,29 +18,29 @@ proc buildBsort(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
-    alias arr, rdi
-    alias n, rsi
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias arr, rdi, rcx
+    alias n, rsi, rdx
     label outer
-    mov rdx, 0 # swapped flag
-    mov rcx, 0 # i
+    mov r10, 0 # swapped flag (r10: scratch on both ABIs)
+    mov r11, 0 # i (r11: scratch on both ABIs)
     label inner
-    mov rax, rcx
+    mov rax, r11
     add rax, 1
     cmp rax, n
     jge fwd("endinner")
-    mov rax, [arr + rcx*8]
-    cmp rax, [arr + rcx*8 + 8]
+    mov rax, [arr + r11*8]
+    cmp rax, [arr + r11*8 + 8]
     jle fwd("noswap")
-    mov r8, [arr + rcx*8 + 8]
-    mov [arr + rcx*8], r8
-    mov [arr + rcx*8 + 8], rax
-    mov rdx, 1
+    mov r8, [arr + r11*8 + 8]
+    mov [arr + r11*8], r8
+    mov [arr + r11*8 + 8], rax
+    mov r10, 1
     label noswap
-    add rcx, 1
+    add r11, 1
     jmp bwd("inner")
     label endinner
-    cmp rdx, 0
+    cmp r10, 0
     jne bwd("outer")
     ret()
   a.finalize()

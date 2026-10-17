@@ -6,4 +6,5 @@ jobs:
     with:
       nim-version: stable
       # macos-15 is ARM64, macos-15-intel is x86_64 (both standard hosted).
-      os: '[{"os":"ubuntu-latest"},{"os":"windows-latest"},{"os":"macos-15"},{"os":"macos-15-intel"}]'
+      # ubuntu-24.04-arm / windows-11-arm cover ARM on Linux/Windows.
+      os: '[{"os":"ubuntu-latest"},{"os":"ubuntu-24.04-arm"},{"os":"windows-latest"},{"os":"windows-11-arm"},{"os":"macos-15"},{"os":"macos-15-intel"}]'

@@ -22,46 +22,46 @@ proc buildNbody(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI (use RCX, RDX on Windows x64).
-    alias st, rdi
-    alias left, rsi
+    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+    alias st, rdi, rcx
+    alias left, rsi, rdx
     label step
     cmp left, 0
     je fwd("done")
-    `xor` ecx, ecx # i
+    `xor` r10d, r10d # i (r10: scratch on both ABIs)
     label outer
-    cmp rcx, 5
+    cmp r10, 5
     jge fwd("integrate")
-    mov rdx, rcx
-    add rdx, 1 # j = i+1
+    mov r11, r10
+    add r11, 1 # j = i+1 (r11: scratch on both ABIs)
     label inner
-    cmp rdx, 5
+    cmp r11, 5
     jge fwd("nexti")
     # dx = x[j]-x[i]; vx[i] += dx; vx[j] -= dx
-    mov rax, [st + rdx*8]
-    sub rax, [st + rcx*8]
-    add [st + rcx*8 + 80], rax
-    sub [st + rdx*8 + 80], rax
+    mov rax, [st + r11*8]
+    sub rax, [st + r10*8]
+    add [st + r10*8 + 80], rax
+    sub [st + r11*8 + 80], rax
     # dy = y[j]-y[i]; vy[i] += dy; vy[j] -= dy
-    mov rax, [st + rdx*8 + 40]
-    sub rax, [st + rcx*8 + 40]
-    add [st + rcx*8 + 120], rax
-    sub [st + rdx*8 + 120], rax
-    add rdx, 1
+    mov rax, [st + r11*8 + 40]
+    sub rax, [st + r10*8 + 40]
+    add [st + r10*8 + 120], rax
+    sub [st + r11*8 + 120], rax
+    add r11, 1
     jmp bwd("inner")
     label nexti
-    add rcx, 1
+    add r10, 1
     jmp bwd("outer")
     label integrate
-    `xor` ecx, ecx
+    `xor` r10d, r10d
     label integ
-    cmp rcx, 5
+    cmp r10, 5
     jge fwd("nextstep")
-    mov rax, [st + rcx*8 + 80]
-    add [st + rcx*8], rax
-    mov rax, [st + rcx*8 + 120]
-    add [st + rcx*8 + 40], rax
-    add rcx, 1
+    mov rax, [st + r10*8 + 80]
+    add [st + r10*8], rax
+    mov rax, [st + r10*8 + 120]
+    add [st + r10*8 + 40], rax
+    add r10, 1
     jmp bwd("integ")
     label nextstep
     sub left, 1

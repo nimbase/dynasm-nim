@@ -21,8 +21,8 @@ proc buildHsort(): ExecutableBuffer =
   dynasm a:
     arch x64
     # SysV: args arrive in RDI, RSI.
-    alias arr, rdi
-    alias n, rsi
+    alias arr, rdi, rcx
+    alias n, rsi, rdx
     # heapify: i = n/2 - 1 down to 0
     mov r9, n
     `shr` r9, 1
@@ -44,8 +44,8 @@ proc buildHsort(): ExecutableBuffer =
     jl fwd("done")
     # swap arr[0], arr[end]
     mov rax, [arr]
-    mov rcx, [arr + r9*8]
-    mov [arr], rcx
+    mov r8, [arr + r9*8]
+    mov [arr], r8
     mov [arr + r9*8], rax
     mov r10, 0 # root
     mov r11, r9 # size = end
@@ -64,22 +64,22 @@ proc buildHsort(): ExecutableBuffer =
     add rax, 1 # child = 2*root+1
     cmp rax, r11
     jge fwd("siftdone")
-    mov rcx, rax
-    add rcx, 1 # right = child+1
-    cmp rcx, r11
+    mov r8, rax
+    add r8, 1 # right = child+1
+    cmp r8, r11
     jge fwd("noright")
     mov rdx, [arr + rax*8]
-    cmp rdx, [arr + rcx*8]
+    cmp rdx, [arr + r8*8]
     jge fwd("noright")
-    mov rax, rcx # child = right
+    mov rax, r8 # child = right
     label noright
     mov rdx, [arr + r10*8] # a[root]
     cmp rdx, [arr + rax*8] # vs a[child]
     jge fwd("siftdone")
-    mov rcx, [arr + r10*8]
+    mov r8, [arr + r10*8]
     mov rdx, [arr + rax*8]
     mov [arr + r10*8], rdx
-    mov [arr + rax*8], rcx
+    mov [arr + rax*8], r8
     mov r10, rax # root = child
     jmp bwd("siftloop")
     label siftdone

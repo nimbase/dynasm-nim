@@ -19,20 +19,20 @@ proc buildSaxpy(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI, RDX, RCX.
-    alias aval, rdi
-    alias xs, rsi
-    alias ys, rdx
-    alias n, rcx
-    `xor` r9, r9 # i
+    # Args: first slots (System V: RDI, RSI, RDX, RCX / Win64: RCX, RDX, R8, R9).
+    alias aval, rdi, rcx
+    alias xs, rsi, rdx
+    alias ys, rdx, r8
+    alias n, rcx, r9
+    `xor` r10, r10 # i (r10: scratch on both ABIs; R9 holds an arg on Win64)
     label loop
-    cmp r9, n
+    cmp r10, n
     jge fwd("done")
-    mov rax, [xs + r9*8]
+    mov rax, [xs + r10*8]
     imul rax, aval
-    add rax, [ys + r9*8]
-    mov [ys + r9*8], rax
-    add r9, 1
+    add rax, [ys + r10*8]
+    mov [ys + r10*8], rax
+    add r10, 1
     jmp bwd("loop")
     label done
     ret()

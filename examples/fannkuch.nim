@@ -21,15 +21,18 @@ proc buildFannkuch(): ExecutableBuffer =
   var a = newAssembler(akX64)
   dynasm a:
     arch x64
-    # SysV: args arrive in RDI, RSI, RDX, RCX.
-    alias perm, rdi
-    alias tmp, rsi
-    alias cnt, rdx
-    alias n, rcx
-    # maxFlip lives in callee-saved R12 (R9 doubles as swap temp).
+    # SysV: args arrive in RDI, RSI, RDX, RCX (Win64: RCX, RDX, R8, R9).
+    alias perm, rdi, rcx
+    alias tmp, rsi, rdx
+    alias cnt, rdx, r8
+    alias n, rcx, r9
+    # maxFlip lives in callee-saved R12 (R13/R14 double as swap temps:
+    # scratch on both ABIs, unlike R8/R9 which hold args on Win64).
     # NOTE: zero it before the init loop — anything between the
     # loop's exit jump and its target label would be skipped.
     push r12
+    push r13
+    push r14
     `xor` r12, r12 # maxFlip = 0 (init below only touches RAX)
     # init perm[i] = i, cnt[i] = 0
     `xor` eax, eax
@@ -46,12 +49,12 @@ proc buildFannkuch(): ExecutableBuffer =
     label copy
     cmp rax, n
     jge fwd("flipstart")
-    mov r8, [perm + rax*8]
-    mov [tmp + rax*8], r8
+    mov r13, [perm + rax*8]
+    mov [tmp + rax*8], r13
     add rax, 1
     jmp bwd("copy")
     label flipstart
-    `xor` r8, r8 # flips = 0
+    `xor` r13, r13 # flips = 0
     label fliploop
     mov rax, [tmp] # first = tmp[0]
     cmp rax, 0
@@ -62,19 +65,19 @@ proc buildFannkuch(): ExecutableBuffer =
     cmp r11, r10
     jge fwd("revend")
     mov rax, [tmp + r11*8]
-    mov r9, [tmp + r10*8]
-    mov [tmp + r11*8], r9
+    mov r14, [tmp + r10*8]
+    mov [tmp + r11*8], r14
     mov [tmp + r10*8], rax
     add r11, 1
     sub r10, 1
     jmp bwd("rev")
     label revend
-    add r8, 1
+    add r13, 1
     jmp bwd("fliploop")
     label flipdone
-    cmp r8, r12
+    cmp r13, r12
     jle fwd("skipmax")
-    mov r12, r8
+    mov r12, r13
     label skipmax
     mov r10, 1 # r = 1
     label nextperm
@@ -86,8 +89,8 @@ proc buildFannkuch(): ExecutableBuffer =
     label rot
     cmp r11, r10
     jge fwd("rotend")
-    mov r9, [perm + r11*8 + 8] # perm[i+1]
-    mov [perm + r11*8], r9
+    mov r14, [perm + r11*8 + 8] # perm[i+1]
+    mov [perm + r11*8], r14
     add r11, 1
     jmp bwd("rot")
     label rotend
@@ -102,6 +105,8 @@ proc buildFannkuch(): ExecutableBuffer =
     jmp bwd("nextperm")
     label alldone
     mov rax, r12
+    pop r14
+    pop r13
     pop r12
     ret()
   a.finalize()

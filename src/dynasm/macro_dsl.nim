@@ -1179,13 +1179,14 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         else: error("arch must be x64, x86 or aarch64", stmt)
       continue
     elif mn == "alias":
-      if args.len != 2:
-        error("alias needs name, reg", stmt)
+      if args.len != 2 and args.len != 3:
+        error("alias needs name, reg (or name, sysv-reg, win-reg)", stmt)
       if args[0].kind != nnkIdent:
         error("alias name must be ident", stmt)
-      if args[1].kind != nnkIdent or
-          not isRegName(args[1].strVal, aliases, curArchA64):
-        error("alias target must be register", stmt)
+      for ai in 1 ..< args.len:
+        if args[ai].kind != nnkIdent or
+            not isRegName(args[ai].strVal, aliases, curArchA64):
+          error("alias target must be register", stmt)
       let aliasName = args[0].strVal.toLowerAscii
       if isRegName(aliasName, aliases, curArchA64):
         error("dynasm: alias name '" & args[0].strVal &
@@ -1193,7 +1194,16 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       if isDynasmWord(aliasName):
         error("dynasm: alias name '" & args[0].strVal &
           "' collides with an instruction or directive", args[0])
-      aliases[aliasName] = args[1].strVal.toLowerAscii
+      # Three-form: first argument register per host ABI. Integer args
+      # arrive in rdi,rsi,rdx,rcx (System V) but rcx,rdx,r8,r9 (Win64),
+      # and a `when` cannot select inside the block (it passes through
+      # unexpanded), so the macro picks by target here. Evaluated at
+      # expansion time, which sees the compilation target's defines.
+      var targetReg = args[1].strVal.toLowerAscii
+      if args.len == 3:
+        when defined(windows):
+          targetReg = args[2].strVal.toLowerAscii
+      aliases[aliasName] = targetReg
       continue
     elif mn in ["label", "locallabel"]:
       if args.len != 1 or args[0].kind != nnkIdent:

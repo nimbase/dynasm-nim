@@ -14,20 +14,18 @@
 # wall time and std/times cpuTime around the loop. The binaries therefore
 # self-report spawn-free per-call throughput; this script just builds
 # them and runs them, saving each binary's output to a log file.
+#
+# On AArch64 hosts (or with BUILD_ONLY=1) the examples only build: they
+# emit x86-64 machine code, which cannot execute there. The script still
+# exits 0 and prints a build-status table instead of timings.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 case "$(uname -m)" in
-  x86_64|amd64) ;;
-  *)
-    echo "error: the bundled examples emit x86-64 machine code and can" >&2
-    echo "only run on x86-64 (this host is $(uname -m)). The dynasm DSL" >&2
-    echo "itself supports AArch64 via \`arch aarch64\`; ported examples" >&2
-    echo "are future work." >&2
-    exit 1
-    ;;
+  x86_64|amd64) CAN_RUN=1 ;;
+  *) CAN_RUN=0 ;;
 esac
 
 EXAMPLES=(fib loop_sum collatz primes mandel sieve bubble_sort nested_loops
@@ -51,6 +49,17 @@ fi
 
 mkdir -p "$OUT" "$RESULTS"
 
+# Builder: clue when available, else plain nim (e.g. ARM runners with
+# no clue binary). Examples import only dynasm + sibling benchutil,
+# so --path:src suffices for the fallback.
+build_one() {
+  if command -v clue >/dev/null 2>&1; then
+    clue build "examples/$1.nim" "${BUILD_FLAGS[@]}" --out:"$OUT/$1" >/dev/null
+  else
+    nim c "${BUILD_FLAGS[@]}" --path:src --out:"$OUT/$1" "examples/$1.nim" >/dev/null
+  fi
+}
+
 echo "==> building ${#EXAMPLES[@]} example(s) [mode=$MODE]"
 for ex in "${EXAMPLES[@]}"; do
   if [ ! -f "examples/$ex.nim" ]; then
@@ -58,8 +67,21 @@ for ex in "${EXAMPLES[@]}"; do
     exit 1
   fi
   echo "  - $ex"
-  clue build "examples/$ex.nim" "${BUILD_FLAGS[@]}" --out:"$OUT/$ex" >/dev/null
+  build_one "$ex"
 done
+
+if [ "$CAN_RUN" = "0" ] || [ "${BUILD_ONLY:-0}" = "1" ]; then
+  # x86-64 code cannot execute here; report build status only.
+  TABLE="| example | build |
+|---|---|---|"
+  for ex in "${EXAMPLES[@]}"; do
+    TABLE="$TABLE
+| $ex | ok |"
+  done
+  echo "$TABLE" | tee "$RESULTS/SUMMARY.md"
+  echo "==> build-only (host is $(uname -m)): binaries in $OUT/, no timings"
+  exit 0
+fi
 
 echo "==> running [BENCH_ITERS=${BENCH_ITERS:-<per-example default>}]"
 for ex in "${EXAMPLES[@]}"; do
