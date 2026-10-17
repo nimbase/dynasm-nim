@@ -52,10 +52,21 @@ test "setcc dsl goldens":
 when defined(amd64):
   test "setcc executes vancode comparison sequences":
     type CmpFn = proc(x, y: int64): int64 {.cdecl.}
+    proc cmpArgs(a: var Assembler) =
+      # First two int args live in rdi/rsi (System V) but rcx/rdx
+      # on Win64 (single x64 calling convention, caller cleanup).
+      when defined(windows):
+        dynasm a:
+          arch x64
+          cmp rcx, rdx
+      else:
+        dynasm a:
+          arch x64
+          cmp rdi, rsi
     var a = newAssembler(akX64)
+    cmpArgs(a)
     dynasm a:
       arch x64
-      cmp rdi, rsi
       sete al
       movzx eax, al
       ret()
@@ -66,9 +77,9 @@ when defined(amd64):
     check eq(6, 5) == 0
     buf.destroy()
     var b = newAssembler(akX64)
+    cmpArgs(b)
     dynasm b:
       arch x64
-      cmp rdi, rsi
       setl al
       movzx eax, al
       ret()
@@ -79,9 +90,9 @@ when defined(amd64):
     check lt(5, 5) == 0
     buf.destroy()
     var c = newAssembler(akX64)
+    cmpArgs(c)
     dynasm c:
       arch x64
-      cmp rdi, rsi
       setg al
       movzx eax, al
       ret()
