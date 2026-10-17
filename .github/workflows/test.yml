@@ -6,5 +6,33 @@ jobs:
     with:
       nim-version: stable
       # macos-15 is ARM64, macos-15-intel is x86_64 (both standard hosted).
-      # ubuntu-24.04-arm / windows-11-arm cover ARM on Linux/Windows.
-      os: '[{"os":"ubuntu-latest"},{"os":"ubuntu-24.04-arm"},{"os":"windows-latest"},{"os":"windows-11-arm"},{"os":"macos-15"},{"os":"macos-15-intel"}]'
+      # ARM Linux/Windows ride test-plain below: clue ships no
+      # linux-arm64 binary, and its runner trips over file locks on
+      # Windows ARM after the tests themselves pass.
+      os: '[{"os":"ubuntu-latest"},{"os":"windows-latest"},{"os":"macos-15"},{"os":"macos-15-intel"}]'
+  test-plain:
+    # Clue-free suite for the ARM runners test_clue cannot serve.
+    # The tests import only dynasm itself (see tests/config.nims),
+    # so plain nim compiles and runs each file directly.
+    name: test-plain (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04-arm}
+          - {os: windows-11-arm}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nimbase/setup-nim-action@main
+        with:
+          nim-version: stable
+      - name: Run tests with plain nim
+        shell: bash
+        run: |
+          set -euo pipefail
+          for t in tests/test*.nim; do
+            echo "==> $t"
+            nim c -r --hints:off "$t"
+          done
