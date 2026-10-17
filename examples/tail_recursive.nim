@@ -19,17 +19,17 @@ proc buildFact*(): ExecutableBuffer =
     dynasm a:
       arch aarch64
       # Args: first slots (AAPCS64: X0, X1). `bl` overwrites the link
-      # register, so each recursive frame spills N together with LR
-      # in one 16-byte slot (keeps SP aligned). After the call only
-      # LR comes back: the result already sits in X0 (which also
-      # homes N), so the N slot is discarded — like the x64 `pop n`,
-      # which only balances the stack after the result lands in RAX.
+      # register, so each recursive frame spills LR together with N
+      # in one 16-byte slot (keeps SP aligned). LR goes first so the
+      # single post-index `ldr` after the call restores it while the
+      # N slot drops — like the x64 `pop n`, which only balances the
+      # stack after the result lands in RAX.
       alias n, x0
       alias acc, x1
       label fact
       cmp n, 1
       b.le fwd("base")
-      stp n, x30, [sp, -16], pre
+      stp x30, n, [sp, -16], pre
       mul acc, acc, n
       sub n, n, 1
       bl bwd("fact")
