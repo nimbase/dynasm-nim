@@ -35,6 +35,7 @@ jobs:
           - {os: ubuntu-latest, arch: amd64}
           - {os: windows-latest, arch: amd64}
           - {os: macos-15-intel, arch: amd64}
+          - {os: macos-15, arch: arm64}
           - {os: ubuntu-24.04-arm, arch: arm64}
           - {os: windows-11-arm, arch: arm64}
     steps:
@@ -46,8 +47,9 @@ jobs:
 
       # No clue binary ships for ARM Linux/Windows: those jobs use
       # the plain-nim fallback in bench.sh (examples need no deps).
+      # macOS ARM has a native clue binary, so it installs normally.
       - name: Install clue
-        if: matrix.arch != 'arm64'
+        if: matrix.os == 'macos-15' || matrix.arch != 'arm64'
         shell: bash
         run: |
           set -eu
@@ -100,7 +102,7 @@ jobs:
           fi
 
       - name: Install dependencies
-        if: matrix.arch != 'arm64'
+        if: matrix.os == 'macos-15' || matrix.arch != 'arm64'
         shell: bash
         run: clue install --depsOnly
 
