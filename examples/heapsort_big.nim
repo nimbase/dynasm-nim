@@ -20,20 +20,24 @@ proc buildHsort(): ExecutableBuffer =
     arch x64
     alias arr, rdi, rcx
     alias n, rsi, rdx
-    mov r9, n
+    # n lives in callee-saved R15: sift uses RDX as
+    # scratch, which carries n on Win64.
+    push r15
+    mov r15, n
+    mov r9, r15
     `shr` r9, 1
     sub r9, 1
     cmp r9, 0
     jl fwd("sortphase")
     label heaploop
     mov r10, r9
-    mov r11, n
+    mov r11, r15
     call fwd("sift")
     sub r9, 1
     cmp r9, 0
     jge bwd("heaploop")
     label sortphase
-    mov r9, n
+    mov r9, r15
     sub r9, 1
     label sortloop
     cmp r9, 1
@@ -48,6 +52,7 @@ proc buildHsort(): ExecutableBuffer =
     sub r9, 1
     jmp bwd("sortloop")
     label done
+    pop r15
     ret()
     label sift
     push r8

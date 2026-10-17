@@ -46,6 +46,12 @@ elif [ "$MODE" != "debug" ]; then
   echo "error: MODE must be 'release' or 'debug', got '$MODE'" >&2
   exit 1
 fi
+# Plain-nim flags mirroring clue's --release/--debug (nim itself has no
+# --release option; -d:release is the portable spelling).
+NIM_FLAGS=()
+if [ "$MODE" = "release" ]; then
+  NIM_FLAGS+=(-d:release --opt:speed)
+fi
 
 mkdir -p "$OUT" "$RESULTS"
 
@@ -56,7 +62,7 @@ build_one() {
   if command -v clue >/dev/null 2>&1; then
     clue build "examples/$1.nim" "${BUILD_FLAGS[@]}" --out:"$OUT/$1" >/dev/null
   else
-    nim c "${BUILD_FLAGS[@]}" --path:src --out:"$OUT/$1" "examples/$1.nim" >/dev/null
+    nim c "${NIM_FLAGS[@]}" --path:src --out:"$OUT/$1" "examples/$1.nim" >/dev/null
   fi
 }
 

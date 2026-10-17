@@ -23,21 +23,25 @@ proc buildHsort(): ExecutableBuffer =
     # SysV: args arrive in RDI, RSI.
     alias arr, rdi, rcx
     alias n, rsi, rdx
+    # n lives in callee-saved R15: sift uses RDX as
+    # scratch, which carries n on Win64.
+    push r15
+    mov r15, n
     # heapify: i = n/2 - 1 down to 0
-    mov r9, n
+    mov r9, r15
     `shr` r9, 1
     sub r9, 1
     cmp r9, 0
     jl fwd("sortphase")
     label heaploop
     mov r10, r9 # root
-    mov r11, n # size
+    mov r11, r15 # size
     call fwd("sift")
     sub r9, 1
     cmp r9, 0
     jge bwd("heaploop")
     label sortphase
-    mov r9, n
+    mov r9, r15
     sub r9, 1 # end
     label sortloop
     cmp r9, 1
@@ -53,6 +57,7 @@ proc buildHsort(): ExecutableBuffer =
     sub r9, 1
     jmp bwd("sortloop")
     label done
+    pop r15
     ret()
     # sift-down: root in R10, size in R11; preserves R8/R9
     label sift
