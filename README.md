@@ -44,9 +44,12 @@ Nim reference before timing. Every binary reports assembled size/time,
 then hammers its hot loop and prints wall/cpu/per-call throughput.
 Generated with `./examples/bench.sh` (release builds); rerun per
 platform from the `bench` workflow (push paths + manual dispatch with
-mode/examples/iters inputs). The same sources run on System V and
-Win64 (argument registers selected per ABI); AArch64 hosts build-only
-(the examples emit x86-64 machine code, which cannot execute there).
+mode/examples/iters inputs). Each example emits native code for its
+host (`when defined(arm64)` selects the AArch64 kernel, otherwise the
+x64 one), so every platform in the matrix executes natively with no
+emulation. The x64 kernels run on System V and Win64 alike (argument
+registers selected per ABI via `alias`); the AArch64 kernels follow
+AAPCS64 on all three OSes.
 
 ### macOS x86-64 (macos-15-intel)
 
@@ -132,67 +135,29 @@ Win64 (argument registers selected per ABI); AArch64 hosts build-only
 | strings | 150 | 76.59 us | 44.12 ms | 0.044s | 147.08 us/call |
 | nbody_float | 141 | 77.22 us | 55.20 ms | 0.055s | 18.401 ms/call |
 
-### Windows ARM64 (windows-11-arm, x86-64 under emulation)
+### Windows ARM64 (windows-11-arm, native AArch64)
 
-| example | bytes | assembled in | wall | cpu | per call |
-|---|---|---|---|---|---|
-| fib | 73 | 3.63 ms | 10.23 ms | 0.010s | 20.5 ns/call |
-| loop_sum | 42 | 3.49 ms | 47.47 ms | 0.048s | 474.66 us/call |
-| collatz | 80 | 3.91 ms | 24.33 ms | 0.024s | 81.1 ns/call |
-| primes | 99 | 4.07 ms | 27.16 ms | 0.027s | 452.7 ns/call |
-| mandel | 106 | 4.12 ms | 21.43 ms | 0.022s | 107.1 ns/call |
-| sieve | 131 | 4.36 ms | 5.94 ms | 0.006s | 118.7 ns/call |
-| bubble_sort | 95 | 4.05 ms | 3.34 ms | 0.003s | 278.6 ns/call |
-| nested_loops | 59 | 3.74 ms | 26.93 ms | 0.027s | 134.65 us/call |
-| tail_recursive | 30 | 3.60 ms | 12.79 ms | 0.013s | 32.0 ns/call |
-| array_sum | 35 | 3.44 ms | 32.16 ms | 0.032s | 64.31 us/call |
-| gcd | 37 | 3.65 ms | 6.50 ms | 0.007s | 8.1 ns/call |
-| dot_product | 40 | 3.38 ms | 15.52 ms | 0.015s | 7.76 us/call |
-| nbody | 147 | 4.40 ms | 179.82 ms | 0.180s | 179.818 ms/call |
-| matmul | 129 | 4.44 ms | 284.58 ms | 0.285s | 142.289 ms/call |
-| saxpy | 38 | 3.67 ms | 70.17 ms | 0.071s | 3.508 ms/call |
-| histogram | 32 | 3.25 ms | 23.26 ms | 0.023s | 775.42 us/call |
-| histogram_big | 32 | 3.41 ms | 74.00 ms | 0.074s | 24.667 ms/call |
-| fannkuch | 254 | 4.72 ms | 325.55 ms | 0.326s | 162.776 ms/call |
-| queens | 199 | 4.46 ms | 530.00 ms | 0.530s | 529.998 ms/call |
-| heapsort | 211 | 4.44 ms | 11.42 ms | 0.012s | 285.58 us/call |
-| heapsort_big | 211 | 4.59 ms | 18.55 ms | 0.018s | 18.545 ms/call |
-| strings | 150 | 4.24 ms | 56.19 ms | 0.056s | 187.31 us/call |
-| nbody_float | 154 | 4.43 ms | 109.43 ms | 0.109s | 36.476 ms/call |
+Native AArch64 table lands here from the first post-merge `bench`
+run (per-OS `SUMMARY.md` artifacts). The numbers previously in this
+spot measured x86-64 code under emulation and were retired with the
+dual-arch port.
 
-### Linux ARM64 (ubuntu-24.04-arm, build-only)
+### Linux ARM64 (ubuntu-24.04-arm, native AArch64)
 
-| example | build |
-|---|---|
-| fib | ok |
-| loop_sum | ok |
-| collatz | ok |
-| primes | ok |
-| mandel | ok |
-| sieve | ok |
-| bubble_sort | ok |
-| nested_loops | ok |
-| tail_recursive | ok |
-| array_sum | ok |
-| gcd | ok |
-| dot_product | ok |
-| nbody | ok |
-| matmul | ok |
-| saxpy | ok |
-| histogram | ok |
-| histogram_big | ok |
-| fannkuch | ok |
-| queens | ok |
-| heapsort | ok |
-| heapsort_big | ok |
-| strings | ok |
-| nbody_float | ok |
+Native AArch64 table lands here from the first post-merge `bench`
+run (per-OS `SUMMARY.md` artifacts).
+
+### macOS ARM64 (macos-15, native AArch64)
+
+Native AArch64 table lands here from the first post-merge `bench`
+run (per-OS `SUMMARY.md` artifacts).
 
 ## Roadmap
 - [x] Pure-Nim macro DSL assembler for x64 and x86
 - [x] Executable memory runtime with callable function pointers
 - [x] Strict compile-time validation with suggestions
 - [x] 23 verified JIT examples with self-reported wall/cpu timings
+  (native x64 + AArch64 kernels, benchmarked without emulation)
 - [x] AArch64 backend: integer core (mov/add/sub/logical/shifts/mul/div,
   ldr/str/ldp/stp, b/bl/br/cbz/tbz/adr, PC-relative relocations)
 - [x] AArch64 SIMD/FP: scalar fmov/fadd/fcmp/scvtf/fcvt, vector

@@ -14,36 +14,69 @@ import std/random
 
 type BsortFn = proc(arr: pointer, n: int64) {.cdecl.}
 
-proc buildBsort(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
-    alias arr, rdi, rcx
-    alias n, rsi, rdx
-    label outer
-    mov r10, 0 # swapped flag (r10: scratch on both ABIs)
-    mov r11, 0 # i (r11: scratch on both ABIs)
-    label inner
-    mov rax, r11
-    add rax, 1
-    cmp rax, n
-    jge fwd("endinner")
-    mov rax, [arr + r11*8]
-    cmp rax, [arr + r11*8 + 8]
-    jle fwd("noswap")
-    mov r8, [arr + r11*8 + 8]
-    mov [arr + r11*8], r8
-    mov [arr + r11*8 + 8], rax
-    mov r10, 1
-    label noswap
-    add r11, 1
-    jmp bwd("inner")
-    label endinner
-    cmp r10, 0
-    jne bwd("outer")
-    ret()
-  a.finalize()
+proc buildBsort*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slots (AAPCS64: X0, X1). The +8-displaced pair
+      # address has no single form, so &a[i] is materialized once
+      # and a[i+1] rides as [cell, #8].
+      alias arr, x0
+      alias n, x1
+      label outer
+      mov x9, xzr # swapped flag
+      mov x10, xzr # i
+      label inner
+      add x11, x10, 1
+      cmp x11, n
+      b.ge fwd("endinner")
+      lsl x11, x10, 3
+      add x11, arr, x11 # &a[i]
+      ldr x12, [x11] # a[i]
+      ldr x13, [x11, 8] # a[i+1]
+      cmp x12, x13
+      b.le fwd("noswap")
+      str x13, [x11]
+      str x12, [x11, 8]
+      mov x9, 1
+      label noswap
+      add x10, x10, 1
+      b bwd("inner")
+      label endinner
+      cbnz x9, bwd("outer")
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+      alias arr, rdi, rcx
+      alias n, rsi, rdx
+      label outer
+      mov r10, 0 # swapped flag (r10: scratch on both ABIs)
+      mov r11, 0 # i (r11: scratch on both ABIs)
+      label inner
+      mov rax, r11
+      add rax, 1
+      cmp rax, n
+      jge fwd("endinner")
+      mov rax, [arr + r11*8]
+      cmp rax, [arr + r11*8 + 8]
+      jle fwd("noswap")
+      mov r8, [arr + r11*8 + 8]
+      mov [arr + r11*8], r8
+      mov [arr + r11*8 + 8], rax
+      mov r10, 1
+      label noswap
+      add r11, 1
+      jmp bwd("inner")
+      label endinner
+      cmp r10, 0
+      jne bwd("outer")
+      ret()
+    a.finalize()
 
 when isMainModule:
   randomize(1234)

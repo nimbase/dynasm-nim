@@ -16,25 +16,52 @@ type HistFn = proc(data: pointer, n: int64, bins: pointer) {.cdecl.}
 const N = 1_000_000
 const Bins = 256
 
-proc buildHist(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slots (System V: RDI, RSI, RDX / Win64: RCX, RDX, R8).
-    alias data, rdi, rcx
-    alias n, rsi, rdx
-    alias bins, rdx, r8
-    `xor` r9d, r9d # i (r9: scratch on both ABIs)
-    label loop
-    cmp r9, n
-    jge fwd("done")
-    movzx eax, byte [data + r9*1]
-    add qword [bins + rax*8], 1
-    add r9, 1
-    jmp bwd("loop")
-    label done
-    ret()
-  a.finalize()
+proc buildHist*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slots (AAPCS64: X0, X1, X2). `ldrb` zero-extends
+      # the input byte (like `movzx`); the counter bump is an
+      # explicit ldr/add/str since memory cannot be an operand.
+      alias data, x0
+      alias n, x1
+      alias bins, x2
+      mov x9, xzr # i
+      label loop
+      cmp x9, n
+      b.ge fwd("done")
+      add x10, data, x9
+      ldrb w10, [x10]
+      lsl x10, x10, 3
+      add x10, bins, x10 # &bins[byte]
+      ldr x11, [x10]
+      add x11, x11, 1
+      str x11, [x10]
+      add x9, x9, 1
+      b bwd("loop")
+      label done
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slots (System V: RDI, RSI, RDX / Win64: RCX, RDX, R8).
+      alias data, rdi, rcx
+      alias n, rsi, rdx
+      alias bins, rdx, r8
+      `xor` r9d, r9d # i (r9: scratch on both ABIs)
+      label loop
+      cmp r9, n
+      jge fwd("done")
+      movzx eax, byte [data + r9*1]
+      add qword [bins + rax*8], 1
+      add r9, 1
+      jmp bwd("loop")
+      label done
+      ret()
+    a.finalize()
 
 proc runHist(hist: HistFn, data: var seq[uint8], bins: var seq[int64]) =
   for b in bins.mitems: b = 0

@@ -12,28 +12,53 @@ import benchutil
 
 type DotFn = proc(a, b: pointer, n: int64): int64 {.cdecl.}
 
-proc buildDot(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slots (System V: RDI, RSI, RDX / Win64: RCX, RDX, R8).
-    alias xs, rdi, rcx
-    alias ys, rsi, rdx
-    alias n, rdx, r8
-    `xor` r10, r10 # acc (r10: scratch on both ABIs)
-    `xor` r11d, r11d # i (r11: scratch on both ABIs)
-    label loop
-    cmp r11, n
-    jge fwd("done")
-    mov rax, [xs + r11*8]
-    imul rax, [ys + r11*8]
-    add r10, rax
-    add r11, 1
-    jmp bwd("loop")
-    label done
-    mov rax, r10
-    ret()
-  a.finalize()
+proc buildDot*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slots (AAPCS64: X0, X1, X2). Two register-offset
+      # loads plus `mul` replace `imul reg, mem`.
+      alias xs, x0
+      alias ys, x1
+      alias n, x2
+      mov x9, xzr # acc
+      mov x10, xzr # i
+      label loop
+      cmp x10, n
+      b.ge fwd("done")
+      ldr x11, [xs, x10, lsl, 3]
+      ldr x12, [ys, x10, lsl, 3]
+      mul x11, x11, x12
+      add x9, x9, x11
+      add x10, x10, 1
+      b bwd("loop")
+      label done
+      mov x0, x9
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slots (System V: RDI, RSI, RDX / Win64: RCX, RDX, R8).
+      alias xs, rdi, rcx
+      alias ys, rsi, rdx
+      alias n, rdx, r8
+      `xor` r10, r10 # acc (r10: scratch on both ABIs)
+      `xor` r11d, r11d # i (r11: scratch on both ABIs)
+      label loop
+      cmp r11, n
+      jge fwd("done")
+      mov rax, [xs + r11*8]
+      imul rax, [ys + r11*8]
+      add r10, rax
+      add r11, 1
+      jmp bwd("loop")
+      label done
+      mov rax, r10
+      ret()
+    a.finalize()
 
 when isMainModule:
   const N = 10_000

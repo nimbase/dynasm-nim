@@ -13,43 +13,76 @@ import benchutil
 
 type IsPrimeFn = proc(n: int64): int64 {.cdecl.}
 
-proc buildIsPrime(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slot (System V: RDI / Win64: RCX).
-    alias n, rdi, rcx
-    mov r8, n
-    cmp r8, 2
-    jl fwd("no")
-    je fwd("yes")
-    # even numbers > 2 are composite
-    mov rax, r8
-    `and` rax, 1
-    cmp rax, 0
-    je fwd("no")
-    mov r10, 3
-    label loop
-    # if r10*r10 > n, n is prime
-    mov rax, r10
-    imul rax, r10
-    cmp rax, r8
-    jg fwd("yes")
-    # rdx:rax / r10, remainder lands in rdx
-    mov rax, r8
-    `xor` rdx, rdx
-    `div` r10
-    cmp rdx, 0
-    je fwd("no")
-    add r10, 2
-    jmp bwd("loop")
-    label yes
-    mov eax, 1
-    ret()
-    label no
-    `xor` eax, eax
-    ret()
-  a.finalize()
+proc buildIsPrime*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slot (AAPCS64: X0). `udiv` + `msub` replace the
+      # x64 `div` (quotient discarded, remainder tested directly).
+      alias n, x0
+      mov x9, n
+      cmp x9, 2
+      b.lt fwd("no")
+      b.eq fwd("yes")
+      # even numbers > 2 are composite
+      tbz x9, 0, fwd("no")
+      mov x10, 3 # d
+      label loop
+      # if d*d > n, n is prime
+      mul x11, x10, x10
+      cmp x11, x9
+      b.gt fwd("yes")
+      # rem = n - (n/d)*d
+      udiv x11, x9, x10
+      msub x11, x11, x10, x9
+      cbz x11, fwd("no")
+      add x10, x10, 2
+      b bwd("loop")
+      label yes
+      mov x0, 1
+      ret()
+      label no
+      mov x0, xzr
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slot (System V: RDI / Win64: RCX).
+      alias n, rdi, rcx
+      mov r8, n
+      cmp r8, 2
+      jl fwd("no")
+      je fwd("yes")
+      # even numbers > 2 are composite
+      mov rax, r8
+      `and` rax, 1
+      cmp rax, 0
+      je fwd("no")
+      mov r10, 3
+      label loop
+      # if r10*r10 > n, n is prime
+      mov rax, r10
+      imul rax, r10
+      cmp rax, r8
+      jg fwd("yes")
+      # rdx:rax / r10, remainder lands in rdx
+      mov rax, r8
+      `xor` rdx, rdx
+      `div` r10
+      cmp rdx, 0
+      je fwd("no")
+      add r10, 2
+      jmp bwd("loop")
+      label yes
+      mov eax, 1
+      ret()
+      label no
+      `xor` eax, eax
+      ret()
+    a.finalize()
 
 proc isPrimeRef(n: int64): bool =
   if n < 2: return false

@@ -18,57 +18,130 @@ type NbodyFn = proc(state: pointer, steps: int64) {.cdecl.}
 
 const Bodies = 5
 
-proc buildNbody(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
-    alias st, rdi, rcx
-    alias left, rsi, rdx
-    label step
-    cmp left, 0
-    je fwd("done")
-    `xor` r10d, r10d # i (r10: scratch on both ABIs)
-    label outer
-    cmp r10, 5
-    jge fwd("integrate")
-    mov r11, r10
-    add r11, 1 # j = i+1 (r11: scratch on both ABIs)
-    label inner
-    cmp r11, 5
-    jge fwd("nexti")
-    # dx = x[j]-x[i]; vx[i] += dx; vx[j] -= dx
-    mov rax, [st + r11*8]
-    sub rax, [st + r10*8]
-    add [st + r10*8 + 80], rax
-    sub [st + r11*8 + 80], rax
-    # dy = y[j]-y[i]; vy[i] += dy; vy[j] -= dy
-    mov rax, [st + r11*8 + 40]
-    sub rax, [st + r10*8 + 40]
-    add [st + r10*8 + 120], rax
-    sub [st + r11*8 + 120], rax
-    add r11, 1
-    jmp bwd("inner")
-    label nexti
-    add r10, 1
-    jmp bwd("outer")
-    label integrate
-    `xor` r10d, r10d
-    label integ
-    cmp r10, 5
-    jge fwd("nextstep")
-    mov rax, [st + r10*8 + 80]
-    add [st + r10*8], rax
-    mov rax, [st + r10*8 + 120]
-    add [st + r10*8 + 40], rax
-    add r10, 1
-    jmp bwd("integ")
-    label nextstep
-    sub left, 1
-    jmp bwd("step")
-    label done
-    ret()
-  a.finalize()
+proc buildNbody*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slots (AAPCS64: X0, X1). AArch64 has no
+      # base+index*scale+displacement form, so each pair address is
+      # materialized (lsl + add) and the lane offset (+0/+40/+80/+120)
+      # rides as the unsigned immediate instead.
+      alias st, x0
+      alias left, x1
+      label step
+      cbz left, fwd("done")
+      mov x9, xzr # i
+      label outer
+      cmp x9, 5
+      b.ge fwd("integrate")
+      add x10, x9, 1 # j = i+1
+      label inner
+      cmp x10, 5
+      b.ge fwd("nexti")
+      # dx = x[j]-x[i]; vx[i] += dx; vx[j] -= dx
+      lsl x12, x10, 3
+      add x12, st, x12 # &x[j]
+      lsl x13, x9, 3
+      add x13, st, x13 # &x[i]
+      ldr x11, [x12]
+      ldr x14, [x13]
+      sub x11, x11, x14 # dx
+      ldr x14, [x13, 80]
+      add x14, x14, x11
+      str x14, [x13, 80]
+      ldr x14, [x12, 80]
+      sub x14, x14, x11
+      str x14, [x12, 80]
+      # dy = y[j]-y[i]; vy[i] += dy; vy[j] -= dy
+      ldr x11, [x12, 40]
+      ldr x14, [x13, 40]
+      sub x11, x11, x14 # dy
+      ldr x14, [x13, 120]
+      add x14, x14, x11
+      str x14, [x13, 120]
+      ldr x14, [x12, 120]
+      sub x14, x14, x11
+      str x14, [x12, 120]
+      add x10, x10, 1
+      b bwd("inner")
+      label nexti
+      add x9, x9, 1
+      b bwd("outer")
+      label integrate
+      mov x9, xzr
+      label integ
+      cmp x9, 5
+      b.ge fwd("nextstep")
+      lsl x12, x9, 3
+      add x12, st, x12 # &body[i]
+      ldr x11, [x12, 80]
+      ldr x14, [x12]
+      add x14, x14, x11
+      str x14, [x12]
+      ldr x11, [x12, 120]
+      ldr x14, [x12, 40]
+      add x14, x14, x11
+      str x14, [x12, 40]
+      add x9, x9, 1
+      b bwd("integ")
+      label nextstep
+      sub left, left, 1
+      b bwd("step")
+      label done
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+      alias st, rdi, rcx
+      alias left, rsi, rdx
+      label step
+      cmp left, 0
+      je fwd("done")
+      `xor` r10d, r10d # i (r10: scratch on both ABIs)
+      label outer
+      cmp r10, 5
+      jge fwd("integrate")
+      mov r11, r10
+      add r11, 1 # j = i+1 (r11: scratch on both ABIs)
+      label inner
+      cmp r11, 5
+      jge fwd("nexti")
+      # dx = x[j]-x[i]; vx[i] += dx; vx[j] -= dx
+      mov rax, [st + r11*8]
+      sub rax, [st + r10*8]
+      add [st + r10*8 + 80], rax
+      sub [st + r11*8 + 80], rax
+      # dy = y[j]-y[i]; vy[i] += dy; vy[j] -= dy
+      mov rax, [st + r11*8 + 40]
+      sub rax, [st + r10*8 + 40]
+      add [st + r10*8 + 120], rax
+      sub [st + r11*8 + 120], rax
+      add r11, 1
+      jmp bwd("inner")
+      label nexti
+      add r10, 1
+      jmp bwd("outer")
+      label integrate
+      `xor` r10d, r10d
+      label integ
+      cmp r10, 5
+      jge fwd("nextstep")
+      mov rax, [st + r10*8 + 80]
+      add [st + r10*8], rax
+      mov rax, [st + r10*8 + 120]
+      add [st + r10*8 + 40], rax
+      add r10, 1
+      jmp bwd("integ")
+      label nextstep
+      sub left, 1
+      jmp bwd("step")
+      label done
+      ret()
+    a.finalize()
 
 proc initState(): seq[int64] =
   result = newSeq[int64](4 * Bodies)

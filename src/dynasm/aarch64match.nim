@@ -951,6 +951,15 @@ proc a64Emit*(mn: string, entry: A64Entry, args: seq[NimNode],
     let scaleLit = newLit(scale)
     return quote do:
       a64MemU(`o`, `baseLit`, `rt`, `rn`, `off`, `scaleLit`)
+  of fMemU0:
+    let rt = regExpr(args[0], aliases)
+    let rn = regExpr(argInfo[1].mem.base, aliases)
+    var off: NimNode = newLit(0)
+    if argInfo[1].shape == asMemOff:
+      off = immI64(argInfo[1].mem.off)
+      a64CheckMemU(mn, 0, argInfo[1].mem.off, stmt)
+    return quote do:
+      a64MemU(`o`, `baseLit`, `rt`, `rn`, `off`, 0)
   of fMem9:
     let rt = regExpr(args[0], aliases)
     var rn, off: NimNode

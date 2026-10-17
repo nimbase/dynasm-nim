@@ -23,8 +23,9 @@ on:
         required: false
 jobs:
   bench:
-    # The bundled examples emit x86-64 machine code: amd64 runners run
-    # the full bench, ARM runners build-only (no execution possible).
+    # Every example emits native code for its host (x64 on amd64,
+    # AArch64 on arm64), so all runners execute the full bench
+    # natively with no emulation.
     name: bench (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90

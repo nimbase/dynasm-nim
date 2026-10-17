@@ -4,14 +4,16 @@
 #   nim r examples/nbody_float.nim
 #
 # The assembler has no SSE backend, so floating-point work stays in
-# Nim: the JIT owns the step/pair loop nest and `call`s a Nim
+# Nim: the JIT owns the step/pair loop nest and calls a Nim
 # {.cdecl.} callback per body pair (gravity with sqrt) plus one
-# integrate callback per step. Loop state that must survive calls
-# lives in callee-saved registers (pushed once at entry); the inner
-# counter J lives in a 16-byte stack slot. Five pushes plus the slot
-# keep RSP 16-byte aligned at every `call`. On Win64 the callbacks
-# additionally need 32 bytes of shadow space and RCX/RDX/R8 args,
-# so the Windows block below mirrors the SysV one with that layout.
+# integrate callback per step (`call` on x64, `blr` on AArch64).
+# Loop state that must survive calls lives in callee-saved registers
+# (pushed once at entry); the inner counter J lives in a stack slot.
+# On x64 five pushes plus the slot keep RSP 16-byte aligned at every
+# `call`; on Win64 the callbacks additionally need 32 bytes of shadow
+# space and RCX/RDX/R8 args, so the Windows block mirrors the SysV
+# one with that layout. On AArch64 X19-X22 plus LR are saved in a 48
+# byte frame (no shadow space under AAPCS64).
 
 import dynasm
 import benchutil
@@ -27,115 +29,174 @@ type
   NbodyFloatFn = proc(bodies: pointer, steps: int64, interact,
     integrate: pointer) {.cdecl.}
 
-proc buildNbodyFloat(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  when defined(windows):
+proc buildNbodyFloat*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
     dynasm a:
-      arch x64
-      # Win64: args arrive in RCX, RDX, R8, R9; callbacks take
-      # RCX/RDX/R8 and require 32 bytes of shadow space above RSP.
-      push rbx
-      push r12
-      push r13
-      push r14
-      push r15
-      sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
-      sub rsp, 32 # shadow space for the callback calls
-      mov rbx, rcx # bodies
-      mov r12, rdx # steps left
-      mov r13, r8 # interact fn
-      mov r14, r9 # integrate fn
+      arch aarch64
+      # AAPCS64: args arrive in X0-X3 and indirect calls go through
+      # `blr` with no shadow space. Loop state that must survive the
+      # callbacks lives in callee-saved X19-X23 (saved once at entry
+      # with LR); the inner counter J lives in a stack slot. The 64
+      # byte frame keeps SP 16-byte aligned at every `blr`.
+      sub sp, sp, 64
+      str x19, [sp]
+      str x20, [sp, 8]
+      str x21, [sp, 16]
+      str x22, [sp, 24]
+      str x23, [sp, 32]
+      str x30, [sp, 40]
+      mov x19, x0 # bodies
+      mov x20, x1 # steps left
+      mov x21, x2 # interact fn
+      mov x22, x3 # integrate fn
       label step
-      cmp r12, 0
-      je fwd("done")
-      `xor` r15, r15 # i = 0
+      cbz x20, fwd("done")
+      mov x23, xzr # i = 0
       label outer
-      cmp r15, 5
-      jge fwd("integrate")
-      mov rax, r15
-      add rax, 1
-      mov [rsp + 32], rax # j = i+1 (past the shadow space)
+      cmp x23, 5
+      b.ge fwd("integrate")
+      add x10, x23, 1
+      str x10, [sp, 48] # j = i+1
       label inner
-      mov rax, [rsp + 32]
-      cmp rax, 5
-      jge fwd("nexti")
-      mov rcx, rbx
-      mov rdx, r15
-      mov r8, [rsp + 32]
-      call r13
-      mov rax, [rsp + 32]
-      add rax, 1
-      mov [rsp + 32], rax
-      jmp bwd("inner")
+      ldr x10, [sp, 48]
+      cmp x10, 5
+      b.ge fwd("nexti")
+      mov x0, x19
+      mov x1, x23
+      mov x2, x10
+      blr x21
+      ldr x10, [sp, 48]
+      add x10, x10, 1
+      str x10, [sp, 48]
+      b bwd("inner")
       label nexti
-      add r15, 1
-      jmp bwd("outer")
+      add x23, x23, 1
+      b bwd("outer")
       label integrate
-      mov rcx, rbx
-      call r14
-      sub r12, 1
-      jmp bwd("step")
+      mov x0, x19
+      blr x22
+      sub x20, x20, 1
+      b bwd("step")
       label done
-      add rsp, 32
-      add rsp, 16
-      pop r15
-      pop r14
-      pop r13
-      pop r12
-      pop rbx
+      ldr x19, [sp]
+      ldr x20, [sp, 8]
+      ldr x21, [sp, 16]
+      ldr x22, [sp, 24]
+      ldr x23, [sp, 32]
+      ldr x30, [sp, 40]
+      add sp, sp, 64
       ret()
+    a.finalize()
   else:
-    dynasm a:
-      arch x64
-      push rbx
-      push r12
-      push r13
-      push r14
-      push r15
-      sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
-      mov rbx, rdi # bodies
-      mov r12, rsi # steps left
-      mov r13, rdx # interact fn
-      mov r14, rcx # integrate fn
-      label step
-      cmp r12, 0
-      je fwd("done")
-      `xor` r15, r15 # i = 0
-      label outer
-      cmp r15, 5
-      jge fwd("integrate")
-      mov rax, r15
-      add rax, 1
-      mov [rsp], rax # j = i+1
-      label inner
-      mov rax, [rsp]
-      cmp rax, 5
-      jge fwd("nexti")
-      mov rdi, rbx
-      mov rsi, r15
-      mov rdx, [rsp]
-      call r13
-      mov rax, [rsp]
-      add rax, 1
-      mov [rsp], rax
-      jmp bwd("inner")
-      label nexti
-      add r15, 1
-      jmp bwd("outer")
-      label integrate
-      mov rdi, rbx
-      call r14
-      sub r12, 1
-      jmp bwd("step")
-      label done
-      add rsp, 16
-      pop r15
-      pop r14
-      pop r13
-      pop r12
-      pop rbx
-      ret()
-  a.finalize()
+    var a = newAssembler(akX64)
+    when defined(windows):
+      dynasm a:
+        arch x64
+        # Win64: args arrive in RCX, RDX, R8, R9; callbacks take
+        # RCX/RDX/R8 and require 32 bytes of shadow space above RSP.
+        push rbx
+        push r12
+        push r13
+        push r14
+        push r15
+        sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
+        sub rsp, 32 # shadow space for the callback calls
+        mov rbx, rcx # bodies
+        mov r12, rdx # steps left
+        mov r13, r8 # interact fn
+        mov r14, r9 # integrate fn
+        label step
+        cmp r12, 0
+        je fwd("done")
+        `xor` r15, r15 # i = 0
+        label outer
+        cmp r15, 5
+        jge fwd("integrate")
+        mov rax, r15
+        add rax, 1
+        mov [rsp + 32], rax # j = i+1 (past the shadow space)
+        label inner
+        mov rax, [rsp + 32]
+        cmp rax, 5
+        jge fwd("nexti")
+        mov rcx, rbx
+        mov rdx, r15
+        mov r8, [rsp + 32]
+        call r13
+        mov rax, [rsp + 32]
+        add rax, 1
+        mov [rsp + 32], rax
+        jmp bwd("inner")
+        label nexti
+        add r15, 1
+        jmp bwd("outer")
+        label integrate
+        mov rcx, rbx
+        call r14
+        sub r12, 1
+        jmp bwd("step")
+        label done
+        add rsp, 32
+        add rsp, 16
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop rbx
+        ret()
+    else:
+      dynasm a:
+        arch x64
+        push rbx
+        push r12
+        push r13
+        push r14
+        push r15
+        sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
+        mov rbx, rdi # bodies
+        mov r12, rsi # steps left
+        mov r13, rdx # interact fn
+        mov r14, rcx # integrate fn
+        label step
+        cmp r12, 0
+        je fwd("done")
+        `xor` r15, r15 # i = 0
+        label outer
+        cmp r15, 5
+        jge fwd("integrate")
+        mov rax, r15
+        add rax, 1
+        mov [rsp], rax # j = i+1
+        label inner
+        mov rax, [rsp]
+        cmp rax, 5
+        jge fwd("nexti")
+        mov rdi, rbx
+        mov rsi, r15
+        mov rdx, [rsp]
+        call r13
+        mov rax, [rsp]
+        add rax, 1
+        mov [rsp], rax
+        jmp bwd("inner")
+        label nexti
+        add r15, 1
+        jmp bwd("outer")
+        label integrate
+        mov rdi, rbx
+        call r14
+        sub r12, 1
+        jmp bwd("step")
+        label done
+        add rsp, 16
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop rbx
+        ret()
+    a.finalize()
 
 proc interact(bodies: pointer, i, j: int64) {.cdecl.} =
   let b = cast[ptr UncheckedArray[float64]](bodies)

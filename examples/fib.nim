@@ -3,42 +3,68 @@
 # Run with:
 #   nim r examples/fib.nim
 #
-# The JIT function follows the SysV AMD64 convention (Linux/macOS):
-#   fib(n: int64): int64   # n in RDI, result in RAX
-# An `alias` maps the first-argument register so the same source also
-# works on Windows x64 (first arg in RCX).
+# The JIT function follows the host C calling convention:
+#   fib(n: int64): int64
+# x64: n in RDI (System V) / RCX (Win64), result in RAX (an `alias`
+# maps the first-argument register). AArch64: n in X0, result in X0.
 
 import dynasm
 import benchutil
 
 type FibFn = proc(n: int64): int64 {.cdecl.}
 
-proc buildFib(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slot (System V: RDI / Win64: RCX).
-    alias n, rdi, rcx
-    mov r8, n
-    cmp r8, 1
-    jle fwd("base")
-    # fib(0) = 0, fib(1) = 1, else iterate a=0, b=1
-    mov r11, 0 # a (r11: scratch on both ABIs)
-    mov rdx, 1 # b
-    mov r10, 2 # i (r10: scratch on both ABIs; RSI is non-volatile on Win64)
-    label loop
-    mov rax, r11
-    add rax, rdx
-    mov r11, rdx
-    mov rdx, rax
-    add r10, 1
-    cmp r10, r8
-    jle bwd("loop")
-    ret()
-    label base
-    mov rax, n
-    ret()
-  a.finalize()
+proc buildFib*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slot (AAPCS64: X0).
+      alias n, x0
+      mov x9, n
+      cmp x9, 1
+      b.le fwd("base")
+      # fib(0) = 0, fib(1) = 1, else iterate a=0, b=1
+      mov x10, xzr # a
+      mov x11, 1 # b
+      mov x12, 2 # i
+      label loop
+      add x13, x10, x11
+      mov x10, x11
+      mov x11, x13
+      add x12, x12, 1
+      cmp x12, x9
+      b.le bwd("loop")
+      mov x0, x11
+      ret()
+      label base
+      ret() # X0 still holds n
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slot (System V: RDI / Win64: RCX).
+      alias n, rdi, rcx
+      mov r8, n
+      cmp r8, 1
+      jle fwd("base")
+      # fib(0) = 0, fib(1) = 1, else iterate a=0, b=1
+      mov r11, 0 # a (r11: scratch on both ABIs)
+      mov rdx, 1 # b
+      mov r10, 2 # i (r10: scratch on both ABIs; RSI is non-volatile on Win64)
+      label loop
+      mov rax, r11
+      add rax, rdx
+      mov r11, rdx
+      mov rdx, rax
+      add r10, 1
+      cmp r10, r8
+      jle bwd("loop")
+      ret()
+      label base
+      mov rax, n
+      ret()
+    a.finalize()
 
 proc fibRef(n: int64): int64 =
   if n <= 1: n

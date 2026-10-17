@@ -49,6 +49,7 @@ type
     fMovWide  ## movz/movn/movk: Ubits(5,16) + hw
     fBfmI     ## lsl/lsr/asr imm aliases
     fMemU     ## unsigned-offset ldr/str: Uscaled(10,12,s)
+    fMemU0    ## byte lane ldrb/strb: Ubits(10,12), unscaled
     fMem9     ## pre/post-index ldr/str: Sbits(12,9)
     fPair     ## ldp/stp: Sscaled(15,7,s)
     fMemX     ## register-offset ldr/str: ExtendsX + S bit
@@ -406,6 +407,19 @@ proc a64Entries*(mn: string): seq[A64Entry] =
       (0xFC200800'u32, @[asD, asMemIdx], fMemX, -1),
       (0x3CA00800'u32, @[asQ, asMemIdx], fMemX, -1),
     ]
+  of "ldrb":
+    @[
+      # Byte load, zero-extended into Wt (upper Xt bits cleared by
+      # the 32-bit write): LDRB Wt, [Xn{, #imm}] — imm 0-4095.
+      (0x39400000'u32, @[asW, asMemOff], fMemU0, -1),
+      (0x39400000'u32, @[asW, asMemBase], fMemU0, -1),
+    ]
+  of "strb":
+    @[
+      # Byte store from Wt/WZR: STRB Wt, [Xn{, #imm}] — imm 0-4095.
+      (0x39000000'u32, @[asW, asMemOff], fMemU0, -1),
+      (0x39000000'u32, @[asW, asMemBase], fMemU0, -1),
+    ]
   of "ldp":
     @[
       (0xA9400000'u32, @[asX, asX, asMemOff], fPair, -1),
@@ -651,7 +665,7 @@ proc a64Mnemonics*(): seq[string] =
     "add", "adds", "sub", "subs", "cmp", "cmn",
     "and", "orr", "eor", "ands", "tst", "mvn", "neg",
     "lsl", "lsr", "asr", "mul", "madd", "msub", "sdiv", "udiv",
-    "ldr", "str", "ldp", "stp",
+    "ldr", "str", "ldrb", "strb", "ldp", "stp",
     "b", "bl", "br", "blr", "ret", "cbz", "cbnz", "tbz", "tbnz",
     "adr", "adrp", "nop", "hlt", "svc", "fmov", "fadd", "fsub",
     "fmul", "fdiv", "fmax", "fmin", "fneg", "fabs", "fsqrt",

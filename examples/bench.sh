@@ -15,18 +15,14 @@
 # self-report spawn-free per-call throughput; this script just builds
 # them and runs them, saving each binary's output to a log file.
 #
-# On AArch64 hosts (or with BUILD_ONLY=1) the examples only build: they
-# emit x86-64 machine code, which cannot execute there. The script still
-# exits 0 and prints a build-status table instead of timings.
+# Every example emits native code for its host (x64 on x86-64, AArch64
+# on ARM), so the timings run natively everywhere with no emulation.
+# With BUILD_ONLY=1 the script only builds and prints a build-status
+# table instead of timings.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-
-case "$(uname -m)" in
-  x86_64|amd64) CAN_RUN=1 ;;
-  *) CAN_RUN=0 ;;
-esac
 
 EXAMPLES=(fib loop_sum collatz primes mandel sieve bubble_sort nested_loops
   tail_recursive array_sum gcd dot_product nbody matmul saxpy histogram
@@ -76,8 +72,8 @@ for ex in "${EXAMPLES[@]}"; do
   build_one "$ex"
 done
 
-if [ "$CAN_RUN" = "0" ] || [ "${BUILD_ONLY:-0}" = "1" ]; then
-  # x86-64 code cannot execute here; report build status only.
+if [ "${BUILD_ONLY:-0}" = "1" ]; then
+  # Build status only, no execution.
   TABLE="| example | build |
 |---|---|---|"
   for ex in "${EXAMPLES[@]}"; do

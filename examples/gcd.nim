@@ -13,29 +13,49 @@ import benchutil
 
 type GcdFn = proc(a, b: int64): int64 {.cdecl.}
 
-proc buildGcd(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
-    alias u, rdi, rcx
-    alias v0, rsi, rdx
-    # v lives in R10: div needs RDX as scratch, and RDX carries an
-    # arg on Win64. R10 is scratch on both ABIs.
-    mov r10, v0
-    label loop
-    cmp r10, 0
-    je fwd("done")
-    mov rax, u
-    `xor` rdx, rdx
-    `div` r10
-    mov u, r10
-    mov r10, rdx
-    jmp bwd("loop")
-    label done
-    mov rax, u
-    ret()
-  a.finalize()
+proc buildGcd*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slots (AAPCS64: X0, X1). `udiv` + `msub` replace
+      # the x64 `div` (remainder computed directly, no RDX state).
+      alias u, x0
+      alias v0, x1
+      mov x9, v0 # v
+      label loop
+      cbz x9, fwd("done")
+      udiv x10, u, x9 # q = u / v
+      msub x10, x10, x9, u # r = u - q*v
+      mov u, x9
+      mov x9, x10
+      b bwd("loop")
+      label done
+      ret() # result already in X0 (u)
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+      alias u, rdi, rcx
+      alias v0, rsi, rdx
+      # v lives in R10: div needs RDX as scratch, and RDX carries an
+      # arg on Win64. R10 is scratch on both ABIs.
+      mov r10, v0
+      label loop
+      cmp r10, 0
+      je fwd("done")
+      mov rax, u
+      `xor` rdx, rdx
+      `div` r10
+      mov u, r10
+      mov r10, rdx
+      jmp bwd("loop")
+      label done
+      mov rax, u
+      ret()
+    a.finalize()
 
 proc gcdRef(a, b: int64): int64 =
   var x = a

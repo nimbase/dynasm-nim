@@ -18,53 +18,94 @@ const
 
 type MandelFn = proc(cx, cy: int64): int64 {.cdecl.}
 
-proc buildMandel(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
-    alias a1, rdi, rcx
-    alias a2, rsi, rdx
-    # RSI is scratch below but non-volatile on Win64: preserve it.
-    push rsi
-    # r8 = cx, r9 = cy, r10 = x, r11 = y, rcx = iter
-    mov r8, a1
-    mov r9, a2
-    `xor` r10, r10
-    `xor` r11, r11
-    `xor` ecx, ecx
-    label loop
-    cmp rcx, 64
-    jge fwd("done")
-    # x2 = (x*x) >> 8, y2 = (y*y) >> 8
-    mov rax, r10
-    imul rax, r10
-    `shr` rax, 8
-    mov rdx, r11
-    imul rdx, r11
-    `shr` rdx, 8
-    # if x2 + y2 > 4*Scale, escape
-    mov rsi, rax
-    add rsi, rdx
-    cmp rsi, 1024
-    jg fwd("done")
-    # y = ((x*y) >> 7) + cy   (2*x*y scaled)
-    mov rsi, r10
-    imul rsi, r11
-    `shr` rsi, 7
-    add rsi, r9
-    # x = x2 - y2 + cx
-    sub rax, rdx
-    add rax, r8
-    mov r10, rax
-    mov r11, rsi
-    add rcx, 1
-    jmp bwd("loop")
-    label done
-    mov rax, rcx
-    pop rsi
-    ret()
-  a.finalize()
+proc buildMandel*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slots (AAPCS64: X0, X1). No calls inside, so
+      # caller-saved temporaries need no preservation (the x64 push
+      # only exists for Win64's non-volatile RSI).
+      alias cx, x0
+      alias cy, x1
+      # x11 = cx, x12 = cy, x9 = x, x10 = y, x13 = iter
+      mov x11, cx
+      mov x12, cy
+      mov x9, xzr
+      mov x10, xzr
+      mov x13, xzr
+      label loop
+      cmp x13, 64
+      b.ge fwd("done")
+      # x2 = (x*x) >> 8, y2 = (y*y) >> 8
+      mul x14, x9, x9
+      lsr x14, x14, 8
+      mul x15, x10, x10
+      lsr x15, x15, 8
+      # if x2 + y2 > 4*Scale, escape
+      add x16, x14, x15
+      cmp x16, 1024
+      b.gt fwd("done")
+      # y = ((x*y) >> 7) + cy   (2*x*y scaled)
+      mul x16, x9, x10
+      lsr x16, x16, 7
+      add x10, x16, x12
+      # x = x2 - y2 + cx
+      sub x14, x14, x15
+      add x9, x14, x11
+      add x13, x13, 1
+      b bwd("loop")
+      label done
+      mov x0, x13
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slots (System V: RDI, RSI / Win64: RCX, RDX).
+      alias a1, rdi, rcx
+      alias a2, rsi, rdx
+      # RSI is scratch below but non-volatile on Win64: preserve it.
+      push rsi
+      # r8 = cx, r9 = cy, r10 = x, r11 = y, rcx = iter
+      mov r8, a1
+      mov r9, a2
+      `xor` r10, r10
+      `xor` r11, r11
+      `xor` ecx, ecx
+      label loop
+      cmp rcx, 64
+      jge fwd("done")
+      # x2 = (x*x) >> 8, y2 = (y*y) >> 8
+      mov rax, r10
+      imul rax, r10
+      `shr` rax, 8
+      mov rdx, r11
+      imul rdx, r11
+      `shr` rdx, 8
+      # if x2 + y2 > 4*Scale, escape
+      mov rsi, rax
+      add rsi, rdx
+      cmp rsi, 1024
+      jg fwd("done")
+      # y = ((x*y) >> 7) + cy   (2*x*y scaled)
+      mov rsi, r10
+      imul rsi, r11
+      `shr` rsi, 7
+      add rsi, r9
+      # x = x2 - y2 + cx
+      sub rax, rdx
+      add rax, r8
+      mov r10, rax
+      mov r11, rsi
+      add rcx, 1
+      jmp bwd("loop")
+      label done
+      mov rax, rcx
+      pop rsi
+      ret()
+    a.finalize()
 
 proc mandelRef(cx, cy: int64): int64 =
   var x = 0'i64

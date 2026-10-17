@@ -11,23 +11,42 @@ import benchutil
 
 type SumFn = proc(n: int64): int64 {.cdecl.}
 
-proc buildSum(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slot (System V: RDI / Win64: RCX).
-    alias n, rdi, rcx
-    mov rax, 0
-    mov r10, 1 # i (r10: scratch on both ABIs)
-    label loop
-    cmp r10, n
-    jg fwd("done")
-    add rax, r10
-    add r10, 1
-    jmp bwd("loop")
-    label done
-    ret()
-  a.finalize()
+proc buildSum*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slot (AAPCS64: X0).
+      alias n, x0
+      mov x9, xzr # total
+      mov x10, 1 # i
+      label loop
+      cmp x10, n
+      b.gt fwd("done")
+      add x9, x9, x10
+      add x10, x10, 1
+      b bwd("loop")
+      label done
+      mov x0, x9
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slot (System V: RDI / Win64: RCX).
+      alias n, rdi, rcx
+      mov rax, 0
+      mov r10, 1 # i (r10: scratch on both ABIs)
+      label loop
+      cmp r10, n
+      jg fwd("done")
+      add rax, r10
+      add r10, 1
+      jmp bwd("loop")
+      label done
+      ret()
+    a.finalize()
 
 when isMainModule:
   let bt0 = getMonoTime()

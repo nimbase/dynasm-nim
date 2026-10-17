@@ -237,6 +237,22 @@ test "aarch64 cset":
   check word(code, 16) == 0x1A9F37E1'u32 # cset w1, hs (clang-verified)
   check word(code, 20) == 0xD65F03C0'u32
 
+test "aarch64 ldrb/strb byte lanes":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch aarch64
+    ldrb w0, [x1]
+    strb w2, [x3, 5]
+    ldrb w4, [sp, 4095]
+    strb wzr, [x0]
+    ret()
+  let code = ops.finalize()
+  check word(code, 0) == 0x39400020'u32  # ldrb w0, [x1]
+  check word(code, 4) == 0x39001462'u32  # strb w2, [x3, #5]
+  check word(code, 8) == 0x397FFFE4'u32 # ldrb w4, [sp, #4095]
+  check word(code, 12) == 0x3900001F'u32 # strb wzr, [x0]
+  check word(code, 16) == 0xD65F03C0'u32
+
 test "aarch64 add/sub sp with register":
   var ops = initVecAssembler(0)
   dynasm ops:

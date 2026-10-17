@@ -13,35 +13,61 @@ import benchutil
 
 type StepsFn = proc(n: int64): int64 {.cdecl.}
 
-proc buildSteps(): ExecutableBuffer =
-  var a = newAssembler(akX64)
-  dynasm a:
-    arch x64
-    # Args: first slot (System V: RDI / Win64: RCX).
-    alias n, rdi, rcx
-    mov rax, n
-    mov r10, 0 # steps (r10: scratch on both ABIs)
-    label loop
-    cmp rax, 1
-    je fwd("done")
-    mov rdx, rax
-    `and` rdx, 1
-    cmp rdx, 0
-    jne fwd("odd")
-    `shr` rax, 1
-    add r10, 1
-    jmp bwd("loop")
-    label odd
-    mov rdx, rax
-    `shl` rdx, 1
-    add rax, rdx
-    add rax, 1
-    add r10, 1
-    jmp bwd("loop")
-    label done
-    mov rax, r10
-    ret()
-  a.finalize()
+proc buildSteps*(): ExecutableBuffer =
+  when defined(arm64):
+    var a = newAssembler(akAarch64)
+    dynasm a:
+      arch aarch64
+      # Args: first slot (AAPCS64: X0).
+      alias n, x0
+      mov x9, n # v
+      mov x10, xzr # steps
+      label loop
+      cmp x9, 1
+      b.eq fwd("done")
+      tbnz x9, 0, fwd("odd") # bit0 set = odd
+      lsr x9, x9, 1
+      add x10, x10, 1
+      b bwd("loop")
+      label odd
+      lsl x11, x9, 1 # 2v
+      add x9, x9, x11 # 3v
+      add x9, x9, 1 # 3v+1
+      add x10, x10, 1
+      b bwd("loop")
+      label done
+      mov x0, x10
+      ret()
+    a.finalize()
+  else:
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      # Args: first slot (System V: RDI / Win64: RCX).
+      alias n, rdi, rcx
+      mov rax, n
+      mov r10, 0 # steps (r10: scratch on both ABIs)
+      label loop
+      cmp rax, 1
+      je fwd("done")
+      mov rdx, rax
+      `and` rdx, 1
+      cmp rdx, 0
+      jne fwd("odd")
+      `shr` rax, 1
+      add r10, 1
+      jmp bwd("loop")
+      label odd
+      mov rdx, rax
+      `shl` rdx, 1
+      add rax, rdx
+      add rax, 1
+      add r10, 1
+      jmp bwd("loop")
+      label done
+      mov rax, r10
+      ret()
+    a.finalize()
 
 proc stepsRef(n: int64): int64 =
   var x = n
