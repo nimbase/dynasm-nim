@@ -784,7 +784,7 @@ proc checkAlu64Imm(mn: string, arg: NimNode, stmt: NimNode) =
     error("dynasm: '" & mn & "' 64-bit immediate " & $arg.intVal &
       " does not fit in 32 bits; load it into a register first", arg)
 
-proc validateCommon(mn: string, args: seq[NimNode],
+proc validateCommon(mn: string, args: openArray[NimNode],
     aliases: Table[string, string], curIsX64: bool, stmt: NimNode) =
   for a in args:
     rejectBadLiteral(mn, a)
@@ -1519,7 +1519,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         rawTarget = args[1]
       else:
         error("jmp needs 1 arg", stmt)
-      validateCommon(mn, @[rawTarget], aliases, curIsX64, stmt)
+      validateCommon(mn, [rawTarget], aliases, curIsX64, stmt)
       validateJmpTarget(mn, rawTarget, aliases, stmt, false)
       let targetNode: NimNode = operandAst(rawTarget, aliases)
       let shortLit = newLit(isShort)
@@ -1542,7 +1542,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       if args[0].kind == nnkCall and getMn(args[0][0]) == "byte":
         isShort = true
         rawTarget = args[0][1]
-      validateCommon(base, @[rawTarget], aliases, curIsX64, stmt)
+      validateCommon(base, [rawTarget], aliases, curIsX64, stmt)
       validateJmpTarget(base, rawTarget, aliases, stmt, true)
       let targetNode: NimNode = operandAst(rawTarget, aliases)
       let baseLit = newLit(base)
@@ -1577,7 +1577,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         let s = opAst(1)
         result.add(quote do: dynasmImul(`o`, `d`, `s`, `isX64Lit`))
       elif args.len == 3:
-        validateCommon(mn, @[args[0], args[1]], aliases, curIsX64,
+        validateCommon(mn, [args[0], args[1]], aliases, curIsX64,
           stmt)
         validateImul(args, aliases, stmt)
         let d = opAst(0)
