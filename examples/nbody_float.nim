@@ -1,19 +1,16 @@
-# nbody_float — float64 n-body with host callbacks in the loop.
+# nbody_float — float64 n-body with an inlined inner loop on x64.
 #
 # Run with:
 #   nim r examples/nbody_float.nim
 #
-# The assembler has no SSE backend, so floating-point work stays in
-# Nim: the JIT owns the step/pair loop nest and calls a Nim
-# {.cdecl.} callback per body pair (gravity with sqrt) plus one
-# integrate callback per step (`call` on x64, `blr` on AArch64).
-# Loop state that must survive calls lives in callee-saved registers
-# (pushed once at entry); the inner counter J lives in a stack slot.
-# On x64 five pushes plus the slot keep RSP 16-byte aligned at every
-# `call`; on Win64 the callbacks additionally need 32 bytes of shadow
-# space and RCX/RDX/R8 args, so the Windows block mirrors the SysV
-# one with that layout. On AArch64 X19-X22 plus LR are saved in a 48
-# byte frame (no shadow space under AAPCS64).
+# The x64 kernel JITs the whole step/pair nest with scalar SSE2
+# (movsd/addsd/mulsd/divsd/sqrtsd); gravity softening (1e-6) and the
+# 0.1 factor live in a constant pool after the trailing ret,
+# addressed RIP-relative. With no calls there is no shadow space and
+# no stack slot (the inner counter J stays in R14); loop state lives
+# in callee-saved registers pushed once at entry. The AArch64 kernel
+# instead owns the loop nest and calls Nim {.cdecl.} callbacks per
+# pair/step (`blr`), with X19-X22 plus LR saved in a 48 byte frame.
 
 import dynasm
 import benchutil
@@ -89,113 +86,108 @@ proc buildNbodyFloat*(): ExecutableBuffer =
       ret()
     a.finalize()
   else:
+    # x64 scalar-SSE2 kernel: the whole nest is inlined (no callbacks).
+    # Bodies hold 5 x (x, y, vx, vy) doubles, 32 bytes per body.
+    # Softening (1e-6) and gravity (0.1) live in a constant pool after
+    # the trailing ret, addressed RIP-relative. One block covers both
+    # ABIs via alias (System V: RDI/RSI, Win64: RCX/RDX); with no
+    # calls there is no shadow space and no stack slot (j stays in R14).
+    # Scratch GPRs (RAX/RCX/RDX) and XMM0-4 are volatile on both ABIs;
+    # loop state lives in callee-saved RBX/R12-R15 (pushed at entry).
     var a = newAssembler(akX64)
-    when defined(windows):
-      dynasm a:
-        arch x64
-        # Win64: args arrive in RCX, RDX, R8, R9; callbacks take
-        # RCX/RDX/R8 and require 32 bytes of shadow space above RSP.
-        push rbx
-        push r12
-        push r13
-        push r14
-        push r15
-        sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
-        sub rsp, 32 # shadow space for the callback calls
-        mov rbx, rcx # bodies
-        mov r12, rdx # steps left
-        mov r13, r8 # interact fn
-        mov r14, r9 # integrate fn
-        label step
-        cmp r12, 0
-        je fwd("done")
-        `xor` r15, r15 # i = 0
-        label outer
-        cmp r15, 5
-        jge fwd("integrate")
-        mov rax, r15
-        add rax, 1
-        mov [rsp + 32], rax # j = i+1 (past the shadow space)
-        label inner
-        mov rax, [rsp + 32]
-        cmp rax, 5
-        jge fwd("nexti")
-        mov rcx, rbx
-        mov rdx, r15
-        mov r8, [rsp + 32]
-        call r13
-        mov rax, [rsp + 32]
-        add rax, 1
-        mov [rsp + 32], rax
-        jmp bwd("inner")
-        label nexti
-        add r15, 1
-        jmp bwd("outer")
-        label integrate
-        mov rcx, rbx
-        call r14
-        sub r12, 1
-        jmp bwd("step")
-        label done
-        add rsp, 32
-        add rsp, 16
-        pop r15
-        pop r14
-        pop r13
-        pop r12
-        pop rbx
-        ret()
-    else:
-      dynasm a:
-        arch x64
-        push rbx
-        push r12
-        push r13
-        push r14
-        push r15
-        sub rsp, 16 # one 8-byte slot for J (+8 padding keeps alignment)
-        mov rbx, rdi # bodies
-        mov r12, rsi # steps left
-        mov r13, rdx # interact fn
-        mov r14, rcx # integrate fn
-        label step
-        cmp r12, 0
-        je fwd("done")
-        `xor` r15, r15 # i = 0
-        label outer
-        cmp r15, 5
-        jge fwd("integrate")
-        mov rax, r15
-        add rax, 1
-        mov [rsp], rax # j = i+1
-        label inner
-        mov rax, [rsp]
-        cmp rax, 5
-        jge fwd("nexti")
-        mov rdi, rbx
-        mov rsi, r15
-        mov rdx, [rsp]
-        call r13
-        mov rax, [rsp]
-        add rax, 1
-        mov [rsp], rax
-        jmp bwd("inner")
-        label nexti
-        add r15, 1
-        jmp bwd("outer")
-        label integrate
-        mov rdi, rbx
-        call r14
-        sub r12, 1
-        jmp bwd("step")
-        label done
-        add rsp, 16
-        pop r15
-        pop r14
-        pop r13
-        pop r12
-        pop rbx
-        ret()
+    dynasm a:
+      arch x64
+      alias bodies, rdi, rcx
+      alias steps, rsi, rdx
+      push rbx
+      push r12
+      push r13
+      push r14
+      push r15
+      mov rbx, bodies
+      mov r12, steps
+      label step
+      cmp r12, 0
+      je fwd("done")
+      `xor` r13, r13 # i = 0
+      label outer
+      cmp r13, 5
+      jge fwd("integrate")
+      mov r14, r13
+      add r14, 1 # j = i+1
+      label inner
+      cmp r14, 5
+      jge fwd("nexti")
+      # interact pair (i in R13, j in R14); byte offsets in RAX/RDX.
+      mov rax, r13
+      `shl` rax, 5
+      mov rdx, r14
+      `shl` rdx, 5
+      movsd xmm0, [rbx + rdx*1]
+      subsd xmm0, [rbx + rax*1] # dx
+      movsd xmm1, [rbx + rdx*1 + 8]
+      subsd xmm1, [rbx + rax*1 + 8] # dy
+      movsd xmm2, xmm0
+      mulsd xmm2, xmm2 # dx*dx
+      movsd xmm3, xmm1
+      mulsd xmm3, xmm3 # dy*dy
+      addsd xmm2, xmm3
+      addsd xmm2, [glob("eps")] # +1e-6
+      sqrtsd xmm2, xmm2 # r
+      movsd xmm3, xmm2
+      mulsd xmm2, xmm2 # r*r
+      mulsd xmm2, xmm3 # r*r*r
+      movsd xmm3, [glob("grav")] # 0.1
+      divsd xmm3, xmm2 # f
+      movsd xmm2, xmm3
+      mulsd xmm2, xmm0 # f*dx
+      movsd xmm4, [rbx + rax*1 + 16]
+      addsd xmm4, xmm2
+      movsd [rbx + rax*1 + 16], xmm4 # b[i].vx +=
+      movsd xmm4, [rbx + rdx*1 + 16]
+      subsd xmm4, xmm2
+      movsd [rbx + rdx*1 + 16], xmm4 # b[j].vx -=
+      mulsd xmm3, xmm1 # f*dy
+      movsd xmm4, [rbx + rax*1 + 24]
+      addsd xmm4, xmm3
+      movsd [rbx + rax*1 + 24], xmm4 # b[i].vy +=
+      movsd xmm4, [rbx + rdx*1 + 24]
+      subsd xmm4, xmm3
+      movsd [rbx + rdx*1 + 24], xmm4 # b[j].vy -=
+      add r14, 1
+      jmp bwd("inner")
+      label nexti
+      add r13, 1
+      jmp bwd("outer")
+      label integrate
+      `xor` r13, r13 # k = 0
+      label iloop
+      cmp r13, 5
+      jge fwd("inext")
+      mov rax, r13
+      `shl` rax, 5
+      movsd xmm0, [rbx + rax*1]
+      addsd xmm0, [rbx + rax*1 + 16] # x += vx
+      movsd [rbx + rax*1], xmm0
+      movsd xmm0, [rbx + rax*1 + 8]
+      addsd xmm0, [rbx + rax*1 + 24] # y += vy
+      movsd [rbx + rax*1 + 8], xmm0
+      add r13, 1
+      jmp bwd("iloop")
+      label inext
+      sub r12, 1
+      jmp bwd("step")
+      label done
+      pop r15
+      pop r14
+      pop r13
+      pop r12
+      pop rbx
+      ret()
+      global eps
+      f64 1e-6
+      global grav
+      f64 0.1
     a.finalize()
 
 proc interact(bodies: pointer, i, j: int64) {.cdecl.} =

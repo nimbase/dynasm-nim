@@ -387,6 +387,12 @@ const setccMnemonics = ["seto", "setno", "setb", "setnae", "setc",
   "setpe", "setnp", "setpo", "setl", "setnge", "setge", "setnl",
   "setle", "setng", "setg", "setnle"]
 
+# x64 SSE scalar-double subset (implied m64 memory operands; the cvt
+# forms carry an explicit 32/64-bit integer side).
+const sseMnemonics = ["movsd", "addsd", "subsd", "mulsd", "divsd",
+  "sqrtsd", "ucomisd", "cvtsi2sd", "cvttsd2si", "xorpd"]
+const sseAluMnemonics = ["addsd", "subsd", "mulsd", "divsd", "sqrtsd"]
+
 const dynasmDirectiveWords = ["arch", "alias", "label", "locallabel",
   "global", "globallabel", "dynamiclabel", "binddyn", "dynlabel", "align",
   "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64",
@@ -436,6 +442,8 @@ proc isDynasmWord(mn: string): bool =
   if mn in a64InstrWords:
     return true
   if mn in aluMnemonics or mn in shiftMnemonics or mn in divMnemonics:
+    return true
+  if mn in sseMnemonics:
     return true
   if mn in jccMnemonics:
     return true
@@ -497,6 +505,10 @@ proc suggestWord(mn: string): string =
     if d > 0 and d <= thresh:
       cands.add((d, w))
   for w in setccMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in sseMnemonics:
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
@@ -677,7 +689,8 @@ proc checkGprNode(mn: string, node: NimNode,
     if isRegName(node.strVal, aliases):
       if resolveRegName(node.strVal, aliases).cls != "rcGpr":
         error("dynasm: '" & mn &
-          "' needs general-purpose registers (no SSE backend yet)", node)
+          "' needs general-purpose registers (xmm needs an SSE " &
+          "mnemonic like movsd/addsd)", node)
   of nnkCall, nnkCommand:
     if node.len == 0:
       return
@@ -689,7 +702,8 @@ proc checkGprNode(mn: string, node: NimNode,
       discard
     elif fn == "rx":
       error("dynasm: '" & mn &
-        "' needs general-purpose registers (no SSE backend yet)", node)
+        "' needs general-purpose registers (xmm needs an SSE " &
+        "mnemonic like movsd/addsd)", node)
     elif fn in ["fwd", "bwd", "glob", "globalref", "dyn", "dynlbl",
         "dynamic", "extaddr", "externaddr", "mem"]:
       discard
@@ -1030,6 +1044,174 @@ proc validateLabelRefArg(mn: string, arg: NimNode, stmt: NimNode) =
     error("dynasm: '" & mn &
       "' needs a label reference like fwd(\"name\"), bwd(\"name\") " &
       "or glob(\"name\")", arg)
+
+# --------------------------------------------------------------------------
+# SSE scalar-double validation. Unlike the GPR paths these skip
+# checkGprNode (which rejects xmm); each operand position declares
+# whether it takes an xmm register, a GPR, or m64 memory instead.
+# --------------------------------------------------------------------------
+
+proc validateSseCommon(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], curIsX64: bool, stmt: NimNode) =
+  for a in args:
+    rejectBadLiteral(mn, a)
+    checkArchNode(a, aliases, curIsX64, stmt)
+
+proc rejectXmmInMem(mn: string, node: NimNode,
+    aliases: Table[string, string]) =
+  ## An xmm base/index would misassemble (the encoder reads the GPR
+  ## file); reject it at compile time. RIP-relative label operands
+  ## contain no registers and pass through.
+  case node.kind
+  of nnkIdent:
+    if isRegName(node.strVal, aliases) and
+        resolveRegName(node.strVal, aliases).cls == "rcXmm":
+      error("dynasm: '" & mn & "' memory operands address with " &
+        "general-purpose registers, not XMM", node)
+  of nnkCall, nnkCommand:
+    if node.len >= 1 and getMn(node[0]) == "rx":
+      error("dynasm: '" & mn & "' memory operands address with " &
+        "general-purpose registers, not XMM", node)
+    for i in 1..<node.len:
+      rejectXmmInMem(mn, node[i], aliases)
+  else:
+    for child in node:
+      rejectXmmInMem(mn, child, aliases)
+
+proc isXmmOperand(o: OpStatic): bool =
+  o.kind == oskReg and o.cls == "rcXmm"
+
+proc checkSseMemSize(mn: string, o: OpStatic, arg: NimNode,
+    needExplicitInt: bool) =
+  if needExplicitInt:
+    # cvtsi2sd integer width: dword or qword, spelled out.
+    if o.size != "sz32" and o.size != "sz64":
+      error("dynasm: '" & mn &
+        "' needs its integer width spelled out, e.g. " &
+        "cvtsi2sd xmm0, dword [rax] or qword [rax]", arg)
+  else:
+    # m64 memory for scalar-double: bare or qword-wrapped.
+    if o.size != "" and o.size != "szNone" and o.size != "sz64":
+      error("dynasm: '" & mn &
+        "' memory must be 8 bytes: use a bare [reg..] or qword [reg..]",
+        arg)
+
+proc validateSseMemReg(mn: string, memArg: NimNode,
+    aliases: Table[string, string], stmt: NimNode) =
+  let m = classifyOperand(memArg, aliases)
+  if m.kind != oskMem and m.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' memory operand must look like [rbx + 8]; wrap a label in " &
+      "[...] for RIP-relative addressing", memArg)
+  checkSseMemSize(mn, m, memArg, needExplicitInt = false)
+  rejectXmmInMem(mn, memArg, aliases)
+
+proc validateMovsd(args: seq[NimNode], aliases: Table[string, string],
+    stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind == oskMem and s.kind == oskMem:
+    error("dynasm: 'movsd' cannot move memory to memory", stmt)
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: 'movsd' needs an XMM register destination, not a " &
+      "general-purpose one; use mov for GPRs", args[0])
+  if s.kind == oskReg and not isXmmOperand(s):
+    error("dynasm: 'movsd' needs an XMM register source, not a " &
+      "general-purpose one", args[1])
+  if s.kind == oskImm or s.kind == oskLabel:
+    error("dynasm: 'movsd' needs an XMM register or m64 memory " &
+      "source", args[1])
+  if d.kind == oskImm or d.kind == oskLabel:
+    error("dynasm: 'movsd' destination must be an XMM register or " &
+      "m64 memory", args[0])
+  if d.kind == oskMem:
+    validateSseMemReg("movsd", args[0], aliases, stmt)
+  if s.kind == oskMem:
+    validateSseMemReg("movsd", args[1], aliases, stmt)
+
+proc validateAluSd(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind != oskReg and d.kind != oskOther:
+    error("dynasm: '" & mn & "' destination must be an XMM register",
+      args[0])
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: '" & mn &
+      "' destination must be an XMM register like xmm0", args[0])
+  if s.kind == oskMem:
+    validateSseMemReg(mn, args[1], aliases, stmt)
+  elif s.kind == oskReg:
+    if not isXmmOperand(s):
+      error("dynasm: '" & mn &
+        "' source must be an XMM register or m64 memory", args[1])
+  elif s.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' source must be an XMM register or m64 memory", args[1])
+
+proc validateUcomisd(args: seq[NimNode], aliases: Table[string, string],
+    stmt: NimNode) =
+  validateAluSd("ucomisd", args, aliases, stmt)
+
+proc validateXorpd(args: seq[NimNode], aliases: Table[string, string],
+    stmt: NimNode) =
+  for i in 0..1:
+    let k = classifyOperand(args[i], aliases)
+    if k.kind == oskReg and not isXmmOperand(k):
+      error("dynasm: 'xorpd' needs XMM registers like xmm0", args[i])
+    elif k.kind != oskReg and k.kind != oskOther:
+      error("dynasm: 'xorpd' only supports register, register " &
+        "operands", args[i])
+
+proc validateCvtsi2sd(args: seq[NimNode], aliases: Table[string, string],
+    stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: 'cvtsi2sd' destination must be an XMM register",
+      args[0])
+  elif d.kind != oskReg and d.kind != oskOther:
+    error("dynasm: 'cvtsi2sd' destination must be an XMM register",
+      args[0])
+  if s.kind == oskReg:
+    if s.cls == "rcXmm":
+      error("dynasm: 'cvtsi2sd' source must be a 32/64-bit " &
+        "general-purpose register or memory", args[1])
+    if s.size != "" and s.size != "szNone" and s.size != "sz32" and
+        s.size != "sz64":
+      error("dynasm: 'cvtsi2sd' source must be 32/64-bit, e.g. " &
+        "cvtsi2sd xmm0, eax or cvtsi2sd xmm0, rax", args[1])
+  elif s.kind == oskMem:
+    checkSseMemSize("cvtsi2sd", s, args[1], needExplicitInt = true)
+    rejectXmmInMem("cvtsi2sd", args[1], aliases)
+  elif s.kind != oskOther:
+    error("dynasm: 'cvtsi2sd' source must be a 32/64-bit register " &
+      "or dword/qword memory", args[1])
+
+proc validateCvttsd2si(args: seq[NimNode], aliases: Table[string, string],
+    stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind == oskReg:
+    if d.cls == "rcXmm":
+      error("dynasm: 'cvttsd2si' destination must be a 32/64-bit " &
+        "general-purpose register", args[0])
+    if d.size != "" and d.size != "szNone" and d.size != "sz32" and
+        d.size != "sz64":
+      error("dynasm: 'cvttsd2si' destination must be 32/64-bit",
+        args[0])
+  elif d.kind != oskOther:
+    error("dynasm: 'cvttsd2si' destination must be a 32/64-bit " &
+      "register", args[0])
+  if s.kind == oskMem:
+    validateSseMemReg("cvttsd2si", args[1], aliases, stmt)
+  elif s.kind == oskReg:
+    if not isXmmOperand(s):
+      error("dynasm: 'cvttsd2si' source must be an XMM register or " &
+        "m64 memory", args[1])
+  elif s.kind != oskOther:
+    error("dynasm: 'cvttsd2si' source must be an XMM register or " &
+      "m64 memory", args[1])
 
 # --------------------------------------------------------------------------
 # Main macro
@@ -1406,7 +1588,8 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       if not isA64Mn(mn):
         if mn in dynasmInstrWords or mn in aluMnemonics or
             mn in shiftMnemonics or mn in divMnemonics or
-            mn in jccMnemonics or mn in setccMnemonics:
+            mn in jccMnemonics or mn in setccMnemonics or
+            mn in sseMnemonics:
           error("dynasm: '" & mn &
             "' is an x86 instruction; use arch x64/x86 for it", stmt)
         error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
@@ -1618,6 +1801,61 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       let d = opAst(0)
       let s = opAst(1)
       result.add(quote do: dynasmMovzx(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["movsd"]:
+      if args.len != 2:
+        error("movsd needs 2 args", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateMovsd(args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmMovsd(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in sseAluMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: dst, src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateAluSd(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let mnLit = newLit(mn)
+      result.add(quote do: dynasmAluSd(`o`, `mnLit`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["ucomisd"]:
+      if args.len != 2:
+        error("ucomisd needs 2 args: lhs, rhs", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateUcomisd(args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmUcomisd(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["cvtsi2sd"]:
+      if args.len != 2:
+        error("cvtsi2sd needs 2 args: xmm dst, int src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateCvtsi2sd(args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmCvtsi2sd(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["cvttsd2si"]:
+      if args.len != 2:
+        error("cvttsd2si needs 2 args: int dst, xmm/m64 src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateCvttsd2si(args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmCvttsd2si(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["xorpd"]:
+      if args.len != 2:
+        error("xorpd needs 2 args", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateXorpd(args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmXorpd(`o`, `d`, `s`))
       continue
     elif mn in ["call"]:
       if args.len != 1:

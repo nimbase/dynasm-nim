@@ -313,3 +313,66 @@ proc dynasmAbs*(a: var auto, size: RelocationSize, lr: LabelRef) =
   of lrAbsolute:
     let enc2 = encodeKind(rkAbsolute, size)
     a.valueReloc(lr.dynId, f, 0, enc2)
+
+# --------------------------------------------------------------------------
+# SSE scalar double. Sizes are implied by the mnemonic (m64); the only
+# explicit sizes involved are the integer sides of the cvt forms.
+# Validation (macro) guarantees xmm/GPR shapes; the encoders trust it
+# like the GPR paths do.
+# --------------------------------------------------------------------------
+
+proc dynasmMovsd*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encMovsdRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encMovsdRegMem(a, dst.reg, src.mem, isX64)
+  elif dst.kind == okMem and src.kind == okReg:
+    encMovsdMemReg(a, dst.mem, src.reg, isX64)
+  else:
+    raise impossibleRelocation("unsupported movsd operands")
+
+proc dynasmAluSd*(a: var auto, mn: string, dst, src: Operand,
+    isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encSseAluRegReg(a, mn, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encSseAluRegMem(a, mn, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported " & mn & " operands")
+
+proc dynasmUcomisd*(a: var auto, lhs, rhs: Operand, isX64: bool) =
+  if lhs.kind == okReg and rhs.kind == okReg:
+    encUcomisdRegReg(a, lhs.reg, rhs.reg)
+  elif lhs.kind == okReg and rhs.kind == okMem:
+    encUcomisdRegMem(a, lhs.reg, rhs.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported ucomisd operands")
+
+proc dynasmCvtsi2sd*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind != okReg:
+    raise impossibleRelocation("cvtsi2sd needs xmm dst")
+  if src.kind == okReg:
+    let sz = if src.regSize != szNone: src.regSize else: sz64
+    encCvtsi2sdRegReg(a, dst.reg, src.reg, sz)
+  elif src.kind == okMem:
+    let sz = if src.memSize != szNone: src.memSize else: sz32
+    encCvtsi2sdRegMem(a, dst.reg, src.mem, sz, isX64)
+  else:
+    raise impossibleRelocation("unsupported cvtsi2sd operands")
+
+proc dynasmCvttsd2si*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind != okReg:
+    raise impossibleRelocation("cvttsd2si needs gpr dst")
+  let sz = if dst.regSize != szNone: dst.regSize else: sz64
+  if src.kind == okReg:
+    encCvttsd2siRegReg(a, dst.reg, sz, src.reg)
+  elif src.kind == okMem:
+    encCvttsd2siRegMem(a, dst.reg, sz, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported cvttsd2si operands")
+
+proc dynasmXorpd*(a: var auto, dst, src: Operand) =
+  if dst.kind == okReg and src.kind == okReg:
+    encXorpdRegReg(a, dst.reg, src.reg)
+  else:
+    raise impossibleRelocation("xorpd only supports reg,reg here")

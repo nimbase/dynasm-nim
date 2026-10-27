@@ -845,3 +845,123 @@ proc encMovzxRegMem*(a: var auto, dst: Register, mem: MemOp,
   else:
     a.push(0xB7'u8)
   emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
+# --------------------------------------------------------------------------
+# SSE scalar double: movsd, addsd/subsd/mulsd/divsd/sqrtsd, ucomisd,
+# cvtsi2sd/cvttsd2si, xorpd.
+#
+# REX.W stays clear (these opcodes ignore it) except in the cvt forms
+# where W selects the 32/64-bit integer side. REX.R extends the xmm
+# reg field, REX.B/X the GPR r/m side. Memory operands reuse the
+# shared ModRM/SIB path, including RIP-relative globals.
+# --------------------------------------------------------------------------
+
+proc encSseRegReg*(a: var auto, prefix: uint8, opcode: uint8, dst,
+    src: Register) =
+  ## Scalar-double ALU / movsd-reg / ucomisd / xorpd reg,reg form.
+  ## Canonical byte order: legacy prefix, then REX, then 0F escape.
+  let t = rexForRM(false, dst, src, MemOp(hasBase: false), false)
+  a.push(prefix)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(opcode)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+
+proc encSseRegMem*(a: var auto, prefix: uint8, opcode: uint8, dst: Register,
+    mem: MemOp, isX64: bool) =
+  ## Scalar-double load / ALU reg,m64 form (also ucomisd reg,m64).
+  let t = rexForRM(false, dst, Register(code: 0, cls: rcGpr), mem, true)
+  a.push(prefix)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(opcode)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
+proc encSseMemReg*(a: var auto, prefix: uint8, opcode: uint8, mem: MemOp,
+    src: Register, isX64: bool) =
+  ## Scalar-double store form (movsd m64, xmm): the ModRM.reg field
+  ## holds the xmm source.
+  let t = rexForRM(false, src, Register(code: 0, cls: rcGpr), mem, true)
+  a.push(prefix)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(opcode)
+  emitMemModRMSIB(a, mem, src.code and 7, isX64)
+
+proc sseAluOpcode(mn: string): uint8 =
+  case mn
+  of "addsd": 0x58'u8
+  of "subsd": 0x5C'u8
+  of "mulsd": 0x59'u8
+  of "divsd": 0x5E'u8
+  of "sqrtsd": 0x51'u8
+  else:
+    raise impossibleRelocation("unknown scalar-double ALU " & mn)
+
+proc encSseAluRegReg*(a: var auto, mn: string, dst, src: Register) =
+  encSseRegReg(a, 0xF2'u8, sseAluOpcode(mn), dst, src)
+
+proc encSseAluRegMem*(a: var auto, mn: string, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0xF2'u8, sseAluOpcode(mn), dst, mem, isX64)
+
+proc encMovsdRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0xF2'u8, 0x10'u8, dst, src)
+
+proc encMovsdRegMem*(a: var auto, dst: Register, mem: MemOp, isX64: bool) =
+  encSseRegMem(a, 0xF2'u8, 0x10'u8, dst, mem, isX64)
+
+proc encMovsdMemReg*(a: var auto, mem: MemOp, src: Register, isX64: bool) =
+  encSseMemReg(a, 0xF2'u8, 0x11'u8, mem, src, isX64)
+
+proc encUcomisdRegReg*(a: var auto, lhs, rhs: Register) =
+  encSseRegReg(a, 0x66'u8, 0x2E'u8, lhs, rhs)
+
+proc encUcomisdRegMem*(a: var auto, lhs: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x2E'u8, lhs, mem, isX64)
+
+proc encXorpdRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0x57'u8, dst, src)
+
+proc encCvtsi2sdRegReg*(a: var auto, dst: Register, src: Register,
+    srcSize: OpSize) =
+  ## int32/int64 -> double. REX.W selects the integer width.
+  let w = srcSize == sz64
+  let t = rexForRM(w, dst, src, MemOp(hasBase: false), false)
+  a.push(0xF2'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x2A'u8)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+
+proc encCvtsi2sdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    memSize: OpSize, isX64: bool) =
+  let w = memSize == sz64
+  let t = rexForRM(w, dst, Register(code: 0, cls: rcGpr), mem, true)
+  a.push(0xF2'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x2A'u8)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
+proc encCvttsd2siRegReg*(a: var auto, dst: Register, dstSize: OpSize,
+    src: Register) =
+  ## double -> int32/int64 with truncation. REX.W selects the result.
+  let w = dstSize == sz64
+  let t = rexForRM(w, dst, src, MemOp(hasBase: false), false)
+  a.push(0xF2'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x2C'u8)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+
+proc encCvttsd2siRegMem*(a: var auto, dst: Register, dstSize: OpSize,
+    mem: MemOp, isX64: bool) =
+  let w = dstSize == sz64
+  let t = rexForRM(w, dst, Register(code: 0, cls: rcGpr), mem, true)
+  a.push(0xF2'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x2C'u8)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
