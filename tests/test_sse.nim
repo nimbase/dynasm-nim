@@ -37,8 +37,13 @@ test "sse movsd encodings":
     arch x64
     movsd xmm0, [rax + 8]
     movsd xmm1, [rbx + rcx*8 + 16]
+    # Win64 arg regs take the same encoder paths (REX.B for R8).
+    movsd xmm0, [r8]
+    cvtsi2sd xmm1, r8
   check v4.finalize() == @[0xF2'u8, 0x0F'u8, 0x10'u8, 0x40'u8, 0x08'u8,
-    0xF2'u8, 0x0F'u8, 0x10'u8, 0x4C'u8, 0xCB'u8, 0x10'u8]
+    0xF2'u8, 0x0F'u8, 0x10'u8, 0x4C'u8, 0xCB'u8, 0x10'u8,
+    0xF2'u8, 0x41'u8, 0x0F'u8, 0x10'u8, 0x00'u8,
+    0xF2'u8, 0x49'u8, 0x0F'u8, 0x2A'u8, 0xC8'u8]
 
 test "sse scalar alu encodings":
   var v = initVecAssembler(0)
@@ -150,11 +155,16 @@ when defined(amd64):
     var a = newAssembler(akX64)
     dynasm a:
       arch x64
-      movsd xmm0, [rdi]
-      addsd xmm0, [rsi]
+      # First-pointer args per ABI (System V: RDI/RSI/RDX,
+      # Win64: RCX/RDX/R8).
+      alias xp, rdi, rcx
+      alias yp, rsi, rdx
+      alias op, rdx, r8
+      movsd xmm0, [xp]
+      addsd xmm0, [yp]
       mulsd xmm0, xmm0
       sqrtsd xmm0, xmm0
-      movsd [rdx], xmm0
+      movsd [op], xmm0
       ret()
     var buf = a.finalize()
     type Fn = proc(x, y, outp: pointer) {.cdecl.}
@@ -170,7 +180,8 @@ when defined(amd64):
     var a = newAssembler(akX64)
     dynasm a:
       arch x64
-      cvtsi2sd xmm0, rdi
+      alias xv, rdi, rcx
+      cvtsi2sd xmm0, xv
       addsd xmm0, xmm0
       cvttsd2si rax, xmm0
       ret()
@@ -185,8 +196,10 @@ when defined(amd64):
     var a = newAssembler(akX64)
     dynasm a:
       arch x64
-      movsd xmm0, [rdi]
-      movsd xmm1, [rsi]
+      alias ap, rdi, rcx
+      alias pb, rsi, rdx
+      movsd xmm0, [ap]
+      movsd xmm1, [pb]
       ucomisd xmm0, xmm1
       seta al
       movzx eax, al
@@ -205,8 +218,9 @@ when defined(amd64):
     var a = newAssembler(akX64)
     dynasm a:
       arch x64
+      alias op, rdi, rcx
       xorpd xmm0, xmm0
-      movsd [rdi], xmm0
+      movsd [op], xmm0
       ret()
     var buf = a.finalize()
     type Fn = proc(outp: pointer) {.cdecl.}
