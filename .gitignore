@@ -11,6 +11,7 @@ testresults/
 bin/
 bench/
 clue.lock
+plans/
 # examples/: only sources stay tracked; compiled binaries, nimcache,
 # logs or any other byproducts of `nim c` / `nim r` next to the
 # sources are never committed

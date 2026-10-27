@@ -48,12 +48,13 @@ proc patchAt*(loc: PatchLoc, buf: var openArray[byte], bufOffset: int,
     bufAddr, target: int) =
   let (start, len) = loc.patchRange(bufOffset)
   assert start >= 0 and start + len <= buf.len
-  var slice = newSeq[byte](len)
-  for i in 0..<len:
-    slice[i] = buf[start + i]
   let v = loc.relocValue(target, bufAddr)
-  var tmp = slice
-  if not loc.relocation.writeValue(tmp, v):
+  # Stack scratch (max reloc size is 8): avoids a heap `newSeq`
+  # per patched relocation on the hot assembly path.
+  var tmp: array[8, byte]
+  for i in 0..<len:
+    tmp[i] = buf[start + i]
+  if not loc.relocation.writeValue(tmp.toOpenArray(0, len - 1), v):
     raise impossibleRelocation("value out of range")
   for i in 0..<len:
     buf[start + i] = tmp[i]
@@ -65,15 +66,14 @@ proc adjustAt*(loc: PatchLoc, buf: var openArray[byte], bufOffset: int,
     return
   of rkRelToAbs, rkAbsToRel:
     let (start, len) = loc.patchRange(bufOffset)
-    var slice = newSeq[byte](len)
+    var tmp: array[8, byte]
     for i in 0..<len:
-      slice[i] = buf[start + i]
-    let cur = loc.relocation.readValue(slice)
+      tmp[i] = buf[start + i]
+    let cur = loc.relocation.readValue(tmp.toOpenArray(0, len - 1))
     let nv =
       if loc.relocation.kind == rkRelToAbs: cur - int64(adjustment)
       else: cur + int64(adjustment)
-    var tmp = slice
-    if not loc.relocation.writeValue(tmp, nv):
+    if not loc.relocation.writeValue(tmp.toOpenArray(0, len - 1), nv):
       raise impossibleRelocation("managed adjust out of range")
     for i in 0..<len:
       buf[start + i] = tmp[i]
@@ -101,16 +101,36 @@ proc pushI16*(a: var SimpleAssembler, v: int16) =
   a.ops.add(byte(u and 0xFF)); a.ops.add(byte((u shr 8) and 0xFF))
 proc pushI32*(a: var SimpleAssembler, v: int32) =
   let u = cast[uint32](v)
-  for i in 0..<4: a.ops.add(byte((u shr (i*8)) and 0xFF))
+  a.ops.add(byte(u and 0xFF))
+  a.ops.add(byte((u shr 8) and 0xFF))
+  a.ops.add(byte((u shr 16) and 0xFF))
+  a.ops.add(byte((u shr 24) and 0xFF))
 proc pushI64*(a: var SimpleAssembler, v: int64) =
   let u = cast[uint64](v)
-  for i in 0..<8: a.ops.add(byte((u shr (i*8)) and 0xFF))
+  a.ops.add(byte(u and 0xFF))
+  a.ops.add(byte((u shr 8) and 0xFF))
+  a.ops.add(byte((u shr 16) and 0xFF))
+  a.ops.add(byte((u shr 24) and 0xFF))
+  a.ops.add(byte((u shr 32) and 0xFF))
+  a.ops.add(byte((u shr 40) and 0xFF))
+  a.ops.add(byte((u shr 48) and 0xFF))
+  a.ops.add(byte((u shr 56) and 0xFF))
 proc pushU16*(a: var SimpleAssembler, v: uint16) =
   a.ops.add(byte(v and 0xFF)); a.ops.add(byte((v shr 8) and 0xFF))
 proc pushU32*(a: var SimpleAssembler, v: uint32) =
-  for i in 0..<4: a.ops.add(byte((v shr (i*8)) and 0xFF))
+  a.ops.add(byte(v and 0xFF))
+  a.ops.add(byte((v shr 8) and 0xFF))
+  a.ops.add(byte((v shr 16) and 0xFF))
+  a.ops.add(byte((v shr 24) and 0xFF))
 proc pushU64*(a: var SimpleAssembler, v: uint64) =
-  for i in 0..<8: a.ops.add(byte((v shr (i*8)) and 0xFF))
+  a.ops.add(byte(v and 0xFF))
+  a.ops.add(byte((v shr 8) and 0xFF))
+  a.ops.add(byte((v shr 16) and 0xFF))
+  a.ops.add(byte((v shr 24) and 0xFF))
+  a.ops.add(byte((v shr 32) and 0xFF))
+  a.ops.add(byte((v shr 40) and 0xFF))
+  a.ops.add(byte((v shr 48) and 0xFF))
+  a.ops.add(byte((v shr 56) and 0xFF))
 
 proc align*(a: var SimpleAssembler, alignment: int, with: byte = 0x90) =
   if alignment <= 1: return
@@ -119,7 +139,7 @@ proc align*(a: var SimpleAssembler, alignment: int, with: byte = 0x90) =
     for _ in m..<alignment: a.push(with)
 
 proc extendBytes*(a: var SimpleAssembler, data: openArray[byte]) =
-  for b in data: a.ops.add(b)
+  a.ops.add(data)
 
 proc finalize*(a: SimpleAssembler): seq[byte] = a.ops
 
@@ -150,16 +170,36 @@ proc pushI16*(a: var VecAssembler, v: int16) =
   a.ops.add(byte(u and 0xFF)); a.ops.add(byte((u shr 8) and 0xFF))
 proc pushI32*(a: var VecAssembler, v: int32) =
   let u = cast[uint32](v)
-  for i in 0..<4: a.ops.add(byte((u shr (i*8)) and 0xFF))
+  a.ops.add(byte(u and 0xFF))
+  a.ops.add(byte((u shr 8) and 0xFF))
+  a.ops.add(byte((u shr 16) and 0xFF))
+  a.ops.add(byte((u shr 24) and 0xFF))
 proc pushI64*(a: var VecAssembler, v: int64) =
   let u = cast[uint64](v)
-  for i in 0..<8: a.ops.add(byte((u shr (i*8)) and 0xFF))
+  a.ops.add(byte(u and 0xFF))
+  a.ops.add(byte((u shr 8) and 0xFF))
+  a.ops.add(byte((u shr 16) and 0xFF))
+  a.ops.add(byte((u shr 24) and 0xFF))
+  a.ops.add(byte((u shr 32) and 0xFF))
+  a.ops.add(byte((u shr 40) and 0xFF))
+  a.ops.add(byte((u shr 48) and 0xFF))
+  a.ops.add(byte((u shr 56) and 0xFF))
 proc pushU16*(a: var VecAssembler, v: uint16) =
   a.ops.add(byte(v and 0xFF)); a.ops.add(byte((v shr 8) and 0xFF))
 proc pushU32*(a: var VecAssembler, v: uint32) =
-  for i in 0..<4: a.ops.add(byte((v shr (i*8)) and 0xFF))
+  a.ops.add(byte(v and 0xFF))
+  a.ops.add(byte((v shr 8) and 0xFF))
+  a.ops.add(byte((v shr 16) and 0xFF))
+  a.ops.add(byte((v shr 24) and 0xFF))
 proc pushU64*(a: var VecAssembler, v: uint64) =
-  for i in 0..<8: a.ops.add(byte((v shr (i*8)) and 0xFF))
+  a.ops.add(byte(v and 0xFF))
+  a.ops.add(byte((v shr 8) and 0xFF))
+  a.ops.add(byte((v shr 16) and 0xFF))
+  a.ops.add(byte((v shr 24) and 0xFF))
+  a.ops.add(byte((v shr 32) and 0xFF))
+  a.ops.add(byte((v shr 40) and 0xFF))
+  a.ops.add(byte((v shr 48) and 0xFF))
+  a.ops.add(byte((v shr 56) and 0xFF))
 
 proc align*(a: var VecAssembler, alignment: int, with: byte = 0x90) =
   if alignment <= 1: return
@@ -168,7 +208,7 @@ proc align*(a: var VecAssembler, alignment: int, with: byte = 0x90) =
     for _ in m..<alignment: a.push(with)
 
 proc extendBytes*(a: var VecAssembler, data: openArray[byte]) =
-  for b in data: a.ops.add(b)
+  a.ops.add(data)
 
 proc newDynamicLabel*(a: var VecAssembler): DynamicLabel =
   a.labels.newDynamicLabel()
@@ -230,9 +270,7 @@ proc valueReloc*(a: var VecAssembler, value: int, fieldOffset, refOffset: int,
   let loc = int(a.offset())
   let pl = newPatchLoc(loc, 0, fieldOffset, refOffset, r)
   try:
-    var ops = a.ops
-    pl.patchAt(ops, 0, a.baseAddr, value)
-    a.ops = ops
+    pl.patchAt(a.ops, 0, a.baseAddr, value)
   except DynasmError as e:
     a.error = e
 
@@ -246,9 +284,7 @@ proc commit*(a: var VecAssembler) =
   for (loc, lbl) in statics:
     let target = int(a.labels.resolveStatic(lbl))
     try:
-      var ops = a.ops
-      loc.patchAt(ops, 0, a.baseAddr, target)
-      a.ops = ops
+      loc.patchAt(a.ops, 0, a.baseAddr, target)
     except DynasmError:
       raise impossibleRelocation("static " & lbl.name)
   let dyns = a.dynamicTargets
@@ -256,9 +292,7 @@ proc commit*(a: var VecAssembler) =
   for (loc, id) in dyns:
     let target = int(a.labels.resolveDynamic(id))
     try:
-      var ops = a.ops
-      loc.patchAt(ops, 0, a.baseAddr, target)
-      a.ops = ops
+      loc.patchAt(a.ops, 0, a.baseAddr, target)
     except DynasmError:
       raise impossibleRelocation("dynamic")
 
@@ -309,16 +343,36 @@ proc pushI16*(a: var Assembler, v: int16) =
   a.staging.add(byte(u and 0xFF)); a.staging.add(byte((u shr 8) and 0xFF))
 proc pushI32*(a: var Assembler, v: int32) =
   let u = cast[uint32](v)
-  for i in 0..<4: a.staging.add(byte((u shr (i*8)) and 0xFF))
+  a.staging.add(byte(u and 0xFF))
+  a.staging.add(byte((u shr 8) and 0xFF))
+  a.staging.add(byte((u shr 16) and 0xFF))
+  a.staging.add(byte((u shr 24) and 0xFF))
 proc pushI64*(a: var Assembler, v: int64) =
   let u = cast[uint64](v)
-  for i in 0..<8: a.staging.add(byte((u shr (i*8)) and 0xFF))
+  a.staging.add(byte(u and 0xFF))
+  a.staging.add(byte((u shr 8) and 0xFF))
+  a.staging.add(byte((u shr 16) and 0xFF))
+  a.staging.add(byte((u shr 24) and 0xFF))
+  a.staging.add(byte((u shr 32) and 0xFF))
+  a.staging.add(byte((u shr 40) and 0xFF))
+  a.staging.add(byte((u shr 48) and 0xFF))
+  a.staging.add(byte((u shr 56) and 0xFF))
 proc pushU16*(a: var Assembler, v: uint16) =
   a.staging.add(byte(v and 0xFF)); a.staging.add(byte((v shr 8) and 0xFF))
 proc pushU32*(a: var Assembler, v: uint32) =
-  for i in 0..<4: a.staging.add(byte((v shr (i*8)) and 0xFF))
+  a.staging.add(byte(v and 0xFF))
+  a.staging.add(byte((v shr 8) and 0xFF))
+  a.staging.add(byte((v shr 16) and 0xFF))
+  a.staging.add(byte((v shr 24) and 0xFF))
 proc pushU64*(a: var Assembler, v: uint64) =
-  for i in 0..<8: a.staging.add(byte((v shr (i*8)) and 0xFF))
+  a.staging.add(byte(v and 0xFF))
+  a.staging.add(byte((v shr 8) and 0xFF))
+  a.staging.add(byte((v shr 16) and 0xFF))
+  a.staging.add(byte((v shr 24) and 0xFF))
+  a.staging.add(byte((v shr 32) and 0xFF))
+  a.staging.add(byte((v shr 40) and 0xFF))
+  a.staging.add(byte((v shr 48) and 0xFF))
+  a.staging.add(byte((v shr 56) and 0xFF))
 
 proc align*(a: var Assembler, alignment: int, with: byte = 0x90) =
   if alignment <= 1: return
@@ -328,7 +382,7 @@ proc align*(a: var Assembler, alignment: int, with: byte = 0x90) =
     m = int(a.offset()) mod alignment
 
 proc extendBytes*(a: var Assembler, data: openArray[byte]) =
-  for b in data: a.staging.add(b)
+  a.staging.add(data)
 
 proc newDynamicLabel*(a: var Assembler): DynamicLabel =
   a.labels.newDynamicLabel()
@@ -436,22 +490,18 @@ proc ensureExecCapacity*(a: var Assembler, need: int) =
   # Open the JIT write gate before copying: a previous commit may
   # have left it closed (Apple Silicon; no-op elsewhere).
   makeWritable(nm, newSize)
-  # copy committed bytes
-  if a.committed.len > 0:
-    copyMem(nm, unsafeAddr a.committed[0], a.committed.len)
   let newAddr = cast[int](nm)
   let delta = newAddr - oldAddr
   if delta != 0 and a.managed.len > 0 and a.committed.len > 0:
-    # adjust managed relocs inside the copied buffer
-    var tmp = newSeq[byte](a.committed.len)
-    copyMem(addr tmp[0], nm, a.committed.len)
-    for _, loc in a.managed.mpairs:
-      loc.adjustAt(tmp, 0, delta)
-      # keep managed loc itself unchanged (location is offset-based)
-    copyMem(nm, addr tmp[0], a.committed.len)
-    # also fix committed seq copy
+    # Adjust the committed copy once, then mirror it into the new
+    # mapping: same result as adjusting both, with one pass and no
+    # temporary seq allocation.
     for _, loc in a.managed.mpairs:
       loc.adjustAt(a.committed, 0, delta)
+      # keep managed loc itself unchanged (location is offset-based)
+  # copy committed bytes (already adjusted if needed)
+  if a.committed.len > 0:
+    copyMem(nm, unsafeAddr a.committed[0], a.committed.len)
   freeMapping(a.execBuf.mem, a.execBuf.mappedSize)
   makeExecutable(nm, newSize, 0)
   a.execBuf.mem = nm
@@ -470,8 +520,11 @@ proc commit*(a: var Assembler) =
   # On fresh realloc, committed bytes were already copied with adjustment.
   # On in-place grow, managed relocs do not need adjustment (same base).
   makeExecutable(a.execBuf.mem, a.execBuf.mappedSize, 0)
-  for b in a.staging:
-    a.committed.add(b)
+  if a.staging.len > 0:
+    let oldLen = a.committed.len
+    a.committed.setLen(oldLen + a.staging.len)
+    copyMem(addr a.committed[oldLen], unsafeAddr a.staging[0],
+      a.staging.len)
   a.staging.setLen(0)
   a.execBuf.length = a.committed.len
   if a.error != nil:
