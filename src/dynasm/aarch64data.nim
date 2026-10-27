@@ -34,6 +34,7 @@ type
     asMod   ## shift/extend modifier ident (lsl/lsr/asr/ror/...)
     asPre   ## trailing `pre` marker
     asCond  ## condition name ident (eq/ne/cs/... for cset)
+    asNone  ## padding for fixed-size shape arrays
 
   A64Form* = enum
     fRRR      ## R(0), R(5), R(16)
@@ -70,7 +71,7 @@ type
 
   A64Entry* = tuple
     base: uint32
-    shapes: seq[A64Shape]
+    shapes: array[5, A64Shape]
     form: A64Form
     rel: int ## -1, else AarchB/AarchBCond/AarchAdr/AarchAdrp/AarchTbz
 
@@ -89,579 +90,579 @@ proc a64Entries*(mn: string): seq[A64Entry] =
   case mn
   of "mov":
     @[
-      (0xAA0003E0'u32, @[asX, asX], fRR, -1),
-      (0x2A0003E0'u32, @[asW, asW], fRR, -1),
+      (0xAA0003E0'u32, [asX, asX, asNone, asNone, asNone], fRR, -1),
+      (0x2A0003E0'u32, [asW, asW, asNone, asNone, asNone], fRR, -1),
       # mov to/from sp is ADD with #0
-      (0x91000000'u32, @[asXSP, asXSP], fRRI12, -1),
-      (0x11000000'u32, @[asWSP, asWSP], fRRI12, -1),
-      (0'u32, @[asX, asImm], fMovI, -1),
-      (0'u32, @[asW, asImm], fMovI, -1),
+      (0x91000000'u32, [asXSP, asXSP, asNone, asNone, asNone], fRRI12, -1),
+      (0x11000000'u32, [asWSP, asWSP, asNone, asNone, asNone], fRRI12, -1),
+      (0'u32, [asX, asImm, asNone, asNone, asNone], fMovI, -1),
+      (0'u32, [asW, asImm, asNone, asNone, asNone], fMovI, -1),
     ]
   of "mov.inverted":
     @[
-      (0'u32, @[asX, asImm], fMovInv, -1),
-      (0'u32, @[asW, asImm], fMovInv, -1),
+      (0'u32, [asX, asImm, asNone, asNone, asNone], fMovInv, -1),
+      (0'u32, [asW, asImm, asNone, asNone, asNone], fMovInv, -1),
     ]
   of "mov.logical":
     @[
-      (0'u32, @[asX, asImm], fMovLogic, -1),
-      (0'u32, @[asW, asImm], fMovLogic, -1),
+      (0'u32, [asX, asImm, asNone, asNone, asNone], fMovLogic, -1),
+      (0'u32, [asW, asImm, asNone, asNone, asNone], fMovLogic, -1),
     ]
   of "movz":
     @[
-      (0xD2800000'u32, @[asX, asImm], fMovWide, -1),
-      (0xD2800000'u32, @[asX, asImm, asMod, asImm], fMovWide, -1),
-      (0x52800000'u32, @[asW, asImm], fMovWide, -1),
-      (0x52800000'u32, @[asW, asImm, asMod, asImm], fMovWide, -1),
+      (0xD2800000'u32, [asX, asImm, asNone, asNone, asNone], fMovWide, -1),
+      (0xD2800000'u32, [asX, asImm, asMod, asImm, asNone], fMovWide, -1),
+      (0x52800000'u32, [asW, asImm, asNone, asNone, asNone], fMovWide, -1),
+      (0x52800000'u32, [asW, asImm, asMod, asImm, asNone], fMovWide, -1),
     ]
   of "movn":
     @[
-      (0x92800000'u32, @[asX, asImm], fMovWide, -1),
-      (0x92800000'u32, @[asX, asImm, asMod, asImm], fMovWide, -1),
-      (0x12800000'u32, @[asW, asImm], fMovWide, -1),
-      (0x12800000'u32, @[asW, asImm, asMod, asImm], fMovWide, -1),
+      (0x92800000'u32, [asX, asImm, asNone, asNone, asNone], fMovWide, -1),
+      (0x92800000'u32, [asX, asImm, asMod, asImm, asNone], fMovWide, -1),
+      (0x12800000'u32, [asW, asImm, asNone, asNone, asNone], fMovWide, -1),
+      (0x12800000'u32, [asW, asImm, asMod, asImm, asNone], fMovWide, -1),
     ]
   of "movk":
     @[
-      (0xF2800000'u32, @[asX, asImm], fMovWide, -1),
-      (0xF2800000'u32, @[asX, asImm, asMod, asImm], fMovWide, -1),
-      (0x72800000'u32, @[asW, asImm], fMovWide, -1),
-      (0x72800000'u32, @[asW, asImm, asMod, asImm], fMovWide, -1),
+      (0xF2800000'u32, [asX, asImm, asNone, asNone, asNone], fMovWide, -1),
+      (0xF2800000'u32, [asX, asImm, asMod, asImm, asNone], fMovWide, -1),
+      (0x72800000'u32, [asW, asImm, asNone, asNone, asNone], fMovWide, -1),
+      (0x72800000'u32, [asW, asImm, asMod, asImm, asNone], fMovWide, -1),
     ]
   of "add":
     @[
-      (0x0E208400'u32, @[asVeB, asVeB, asVeB], fVecRRR, -1),
-      (0x0E608400'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x0EA08400'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x0EE08400'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
-      (0x8B000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0x8B000000'u32, @[asX, asX, asX, asMod], fRRR, -1),
-      (0x8B000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x0B000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x0B000000'u32, @[asW, asW, asW, asMod], fRRR, -1),
-      (0x0B000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0x0E208400'u32, [asVeB, asVeB, asVeB, asNone, asNone], fVecRRR, -1),
+      (0x0E608400'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x0EA08400'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x0EE08400'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
+      (0x8B000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x8B000000'u32, [asX, asX, asX, asMod, asNone], fRRR, -1),
+      (0x8B000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x0B000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x0B000000'u32, [asW, asW, asW, asMod, asNone], fRRR, -1),
+      (0x0B000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
       # SP is legal in Rd/Rn (not Rm) of ADD shifted-register.
-      (0x8B000000'u32, @[asXSP, asXSP, asX], fRRR, -1),
-      (0x91000000'u32, @[asXSP, asXSP, asImm], fRRI12, -1),
-      (0x91000000'u32, @[asXSP, asXSP, asImm, asMod, asImm], fRRI12, -1),
-      (0x11000000'u32, @[asWSP, asWSP, asImm], fRRI12, -1),
-      (0x11000000'u32, @[asWSP, asWSP, asImm, asMod, asImm], fRRI12, -1),
+      (0x8B000000'u32, [asXSP, asXSP, asX, asNone, asNone], fRRR, -1),
+      (0x91000000'u32, [asXSP, asXSP, asImm, asNone, asNone], fRRI12, -1),
+      (0x91000000'u32, [asXSP, asXSP, asImm, asMod, asImm], fRRI12, -1),
+      (0x11000000'u32, [asWSP, asWSP, asImm, asNone, asNone], fRRI12, -1),
+      (0x11000000'u32, [asWSP, asWSP, asImm, asMod, asImm], fRRI12, -1),
     ]
   of "adds":
     @[
-      (0xAB000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0xAB000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x2B000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x2B000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
-      (0xB1000000'u32, @[asX, asX, asImm], fRRI12, -1),
-      (0xB1000000'u32, @[asX, asX, asImm, asMod, asImm], fRRI12, -1),
-      (0x31000000'u32, @[asW, asW, asImm], fRRI12, -1),
-      (0x31000000'u32, @[asW, asW, asImm, asMod, asImm], fRRI12, -1),
+      (0xAB000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0xAB000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x2B000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x2B000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0xB1000000'u32, [asX, asX, asImm, asNone, asNone], fRRI12, -1),
+      (0xB1000000'u32, [asX, asX, asImm, asMod, asImm], fRRI12, -1),
+      (0x31000000'u32, [asW, asW, asImm, asNone, asNone], fRRI12, -1),
+      (0x31000000'u32, [asW, asW, asImm, asMod, asImm], fRRI12, -1),
     ]
   of "sub":
     @[
-      (0x2E208400'u32, @[asVeB, asVeB, asVeB], fVecRRR, -1),
-      (0x2E608400'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x2EA08400'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x2EE08400'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
-      (0xCB000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0xCB000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x4B000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x4B000000'u32, @[asW, asW, asW, asMod], fRRR, -1),
-      (0x4B000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0x2E208400'u32, [asVeB, asVeB, asVeB, asNone, asNone], fVecRRR, -1),
+      (0x2E608400'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x2EA08400'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x2EE08400'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
+      (0xCB000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0xCB000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x4B000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x4B000000'u32, [asW, asW, asW, asMod, asNone], fRRR, -1),
+      (0x4B000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
       # SP is legal in Rd/Rn (not Rm) of SUB shifted-register.
-      (0xCB000000'u32, @[asXSP, asXSP, asX], fRRR, -1),
-      (0xD1000000'u32, @[asXSP, asXSP, asImm], fRRI12, -1),
-      (0xD1000000'u32, @[asXSP, asXSP, asImm, asMod, asImm], fRRI12, -1),
-      (0x51000000'u32, @[asWSP, asWSP, asImm], fRRI12, -1),
-      (0x51000000'u32, @[asWSP, asWSP, asImm, asMod, asImm], fRRI12, -1),
+      (0xCB000000'u32, [asXSP, asXSP, asX, asNone, asNone], fRRR, -1),
+      (0xD1000000'u32, [asXSP, asXSP, asImm, asNone, asNone], fRRI12, -1),
+      (0xD1000000'u32, [asXSP, asXSP, asImm, asMod, asImm], fRRI12, -1),
+      (0x51000000'u32, [asWSP, asWSP, asImm, asNone, asNone], fRRI12, -1),
+      (0x51000000'u32, [asWSP, asWSP, asImm, asMod, asImm], fRRI12, -1),
     ]
   of "subs":
     @[
-      (0xEB000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0xEB000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x6B000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x6B000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
-      (0xF1000000'u32, @[asX, asX, asImm], fRRI12, -1),
-      (0xF1000000'u32, @[asX, asX, asImm, asMod, asImm], fRRI12, -1),
-      (0x71000000'u32, @[asW, asW, asImm], fRRI12, -1),
-      (0x71000000'u32, @[asW, asW, asImm, asMod, asImm], fRRI12, -1),
+      (0xEB000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0xEB000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x6B000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x6B000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0xF1000000'u32, [asX, asX, asImm, asNone, asNone], fRRI12, -1),
+      (0xF1000000'u32, [asX, asX, asImm, asMod, asImm], fRRI12, -1),
+      (0x71000000'u32, [asW, asW, asImm, asNone, asNone], fRRI12, -1),
+      (0x71000000'u32, [asW, asW, asImm, asMod, asImm], fRRI12, -1),
     ]
   of "cmp":
     @[
-      (0xEB00001F'u32, @[asX, asX], fXRR, -1),
-      (0xEB00001F'u32, @[asX, asX, asMod, asImm], fXRR, -1),
-      (0x6B00001F'u32, @[asW, asW], fXRR, -1),
-      (0x6B00001F'u32, @[asW, asW, asMod, asImm], fXRR, -1),
-      (0xF100001F'u32, @[asXSP, asImm], fRRI12, -1),
-      (0xF100001F'u32, @[asXSP, asImm, asMod, asImm], fRRI12, -1),
-      (0x7100001F'u32, @[asWSP, asImm], fRRI12, -1),
-      (0x7100001F'u32, @[asWSP, asImm, asMod, asImm], fRRI12, -1),
+      (0xEB00001F'u32, [asX, asX, asNone, asNone, asNone], fXRR, -1),
+      (0xEB00001F'u32, [asX, asX, asMod, asImm, asNone], fXRR, -1),
+      (0x6B00001F'u32, [asW, asW, asNone, asNone, asNone], fXRR, -1),
+      (0x6B00001F'u32, [asW, asW, asMod, asImm, asNone], fXRR, -1),
+      (0xF100001F'u32, [asXSP, asImm, asNone, asNone, asNone], fRRI12, -1),
+      (0xF100001F'u32, [asXSP, asImm, asMod, asImm, asNone], fRRI12, -1),
+      (0x7100001F'u32, [asWSP, asImm, asNone, asNone, asNone], fRRI12, -1),
+      (0x7100001F'u32, [asWSP, asImm, asMod, asImm, asNone], fRRI12, -1),
     ]
   of "cmn":
     @[
-      (0xAB00001F'u32, @[asX, asX], fXRR, -1),
-      (0xAB00001F'u32, @[asX, asX, asMod, asImm], fXRR, -1),
-      (0x2B00001F'u32, @[asW, asW], fXRR, -1),
-      (0x2B00001F'u32, @[asW, asW, asMod, asImm], fXRR, -1),
-      (0xB100001F'u32, @[asXSP, asImm], fRRI12, -1),
-      (0xB100001F'u32, @[asXSP, asImm, asMod, asImm], fRRI12, -1),
-      (0x3100001F'u32, @[asWSP, asImm], fRRI12, -1),
-      (0x3100001F'u32, @[asWSP, asImm, asMod, asImm], fRRI12, -1),
+      (0xAB00001F'u32, [asX, asX, asNone, asNone, asNone], fXRR, -1),
+      (0xAB00001F'u32, [asX, asX, asMod, asImm, asNone], fXRR, -1),
+      (0x2B00001F'u32, [asW, asW, asNone, asNone, asNone], fXRR, -1),
+      (0x2B00001F'u32, [asW, asW, asMod, asImm, asNone], fXRR, -1),
+      (0xB100001F'u32, [asXSP, asImm, asNone, asNone, asNone], fRRI12, -1),
+      (0xB100001F'u32, [asXSP, asImm, asMod, asImm, asNone], fRRI12, -1),
+      (0x3100001F'u32, [asWSP, asImm, asNone, asNone, asNone], fRRI12, -1),
+      (0x3100001F'u32, [asWSP, asImm, asMod, asImm, asNone], fRRI12, -1),
     ]
   of "and":
     @[
-      (0x0E201C00'u32, @[asVeB, asVeB, asVeB], fVecRRR, -1),
-      (0x8A000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0x8A000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x0A000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x0A000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
-      (0x92000000'u32, @[asXSP, asX, asImm], fLogicI, -1),
-      (0x12000000'u32, @[asWSP, asW, asImm], fLogicI, -1),
+      (0x0E201C00'u32, [asVeB, asVeB, asVeB, asNone, asNone], fVecRRR, -1),
+      (0x8A000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x8A000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x0A000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x0A000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0x92000000'u32, [asXSP, asX, asImm, asNone, asNone], fLogicI, -1),
+      (0x12000000'u32, [asWSP, asW, asImm, asNone, asNone], fLogicI, -1),
     ]
   of "orr":
     @[
-      (0x0EA01C00'u32, @[asVeB, asVeB, asVeB], fVecRRR, -1),
-      (0xAA000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0xAA000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x2A000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x2A000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
-      (0xB2000000'u32, @[asXSP, asX, asImm], fLogicI, -1),
-      (0x32000000'u32, @[asWSP, asW, asImm], fLogicI, -1),
+      (0x0EA01C00'u32, [asVeB, asVeB, asVeB, asNone, asNone], fVecRRR, -1),
+      (0xAA000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0xAA000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x2A000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x2A000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0xB2000000'u32, [asXSP, asX, asImm, asNone, asNone], fLogicI, -1),
+      (0x32000000'u32, [asWSP, asW, asImm, asNone, asNone], fLogicI, -1),
     ]
   of "eor":
     @[
-      (0x2E201C00'u32, @[asVeB, asVeB, asVeB], fVecRRR, -1),
-      (0xCA000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0xCA000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x4A000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x4A000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
-      (0xD2000000'u32, @[asXSP, asX, asImm], fLogicI, -1),
-      (0x52000000'u32, @[asWSP, asW, asImm], fLogicI, -1),
+      (0x2E201C00'u32, [asVeB, asVeB, asVeB, asNone, asNone], fVecRRR, -1),
+      (0xCA000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0xCA000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x4A000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x4A000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0xD2000000'u32, [asXSP, asX, asImm, asNone, asNone], fLogicI, -1),
+      (0x52000000'u32, [asWSP, asW, asImm, asNone, asNone], fLogicI, -1),
     ]
   of "bic":
     @[
-      (0x0E601C00'u32, @[asVeB, asVeB, asVeB], fVecRRR, -1),
+      (0x0E601C00'u32, [asVeB, asVeB, asVeB, asNone, asNone], fVecRRR, -1),
     ]
   of "ands":
     @[
-      (0xEA000000'u32, @[asX, asX, asX], fRRR, -1),
-      (0xEA000000'u32, @[asX, asX, asX, asMod, asImm], fRRR, -1),
-      (0x6A000000'u32, @[asW, asW, asW], fRRR, -1),
-      (0x6A000000'u32, @[asW, asW, asW, asMod, asImm], fRRR, -1),
-      (0xF2000000'u32, @[asX, asX, asImm], fLogicI, -1),
-      (0x72000000'u32, @[asW, asW, asImm], fLogicI, -1),
+      (0xEA000000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0xEA000000'u32, [asX, asX, asX, asMod, asImm], fRRR, -1),
+      (0x6A000000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x6A000000'u32, [asW, asW, asW, asMod, asImm], fRRR, -1),
+      (0xF2000000'u32, [asX, asX, asImm, asNone, asNone], fLogicI, -1),
+      (0x72000000'u32, [asW, asW, asImm, asNone, asNone], fLogicI, -1),
     ]
   of "tst":
     @[
-      (0xEA00001F'u32, @[asX, asX], fXRR, -1),
-      (0xEA00001F'u32, @[asX, asX, asMod, asImm], fXRR, -1),
-      (0x6A00001F'u32, @[asW, asW], fXRR, -1),
-      (0x6A00001F'u32, @[asW, asW, asMod, asImm], fXRR, -1),
-      (0xF200001F'u32, @[asX, asImm], fLogicI, -1),
-      (0x7200001F'u32, @[asW, asImm], fLogicI, -1),
+      (0xEA00001F'u32, [asX, asX, asNone, asNone, asNone], fXRR, -1),
+      (0xEA00001F'u32, [asX, asX, asMod, asImm, asNone], fXRR, -1),
+      (0x6A00001F'u32, [asW, asW, asNone, asNone, asNone], fXRR, -1),
+      (0x6A00001F'u32, [asW, asW, asMod, asImm, asNone], fXRR, -1),
+      (0xF200001F'u32, [asX, asImm, asNone, asNone, asNone], fLogicI, -1),
+      (0x7200001F'u32, [asW, asImm, asNone, asNone, asNone], fLogicI, -1),
     ]
   of "mvn":
     @[
-      (0xAA2003E0'u32, @[asX, asX], fRR, -1),
-      (0xAA2003E0'u32, @[asX, asX, asMod, asImm], fRR, -1),
-      (0x2A2003E0'u32, @[asW, asW], fRR, -1),
-      (0x2A2003E0'u32, @[asW, asW, asMod, asImm], fRR, -1),
+      (0xAA2003E0'u32, [asX, asX, asNone, asNone, asNone], fRR, -1),
+      (0xAA2003E0'u32, [asX, asX, asMod, asImm, asNone], fRR, -1),
+      (0x2A2003E0'u32, [asW, asW, asNone, asNone, asNone], fRR, -1),
+      (0x2A2003E0'u32, [asW, asW, asMod, asImm, asNone], fRR, -1),
     ]
   of "neg":
     @[
-      (0xCB0003E0'u32, @[asX, asX], fRR, -1),
-      (0xCB0003E0'u32, @[asX, asX, asMod, asImm], fRR, -1),
-      (0x4B0003E0'u32, @[asW, asW], fRR, -1),
-      (0x4B0003E0'u32, @[asW, asW, asMod, asImm], fRR, -1),
+      (0xCB0003E0'u32, [asX, asX, asNone, asNone, asNone], fRR, -1),
+      (0xCB0003E0'u32, [asX, asX, asMod, asImm, asNone], fRR, -1),
+      (0x4B0003E0'u32, [asW, asW, asNone, asNone, asNone], fRR, -1),
+      (0x4B0003E0'u32, [asW, asW, asMod, asImm, asNone], fRR, -1),
     ]
   of "lsl":
     @[
-      (0x9AC02000'u32, @[asX, asX, asX], fRRR, -1),
-      (0x1AC02000'u32, @[asW, asW, asW], fRRR, -1),
-      (0xD3400000'u32, @[asX, asX, asImm], fBfmI, -1),
-      (0x53000000'u32, @[asW, asW, asImm], fBfmI, -1),
+      (0x9AC02000'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x1AC02000'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0xD3400000'u32, [asX, asX, asImm, asNone, asNone], fBfmI, -1),
+      (0x53000000'u32, [asW, asW, asImm, asNone, asNone], fBfmI, -1),
     ]
   of "lsr":
     @[
-      (0x9AC02400'u32, @[asX, asX, asX], fRRR, -1),
-      (0x1AC02400'u32, @[asW, asW, asW], fRRR, -1),
-      (0xD340FC00'u32, @[asX, asX, asImm], fBfmI, -1),
-      (0x53007C00'u32, @[asW, asW, asImm], fBfmI, -1),
+      (0x9AC02400'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x1AC02400'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0xD340FC00'u32, [asX, asX, asImm, asNone, asNone], fBfmI, -1),
+      (0x53007C00'u32, [asW, asW, asImm, asNone, asNone], fBfmI, -1),
     ]
   of "asr":
     @[
-      (0x9AC02800'u32, @[asX, asX, asX], fRRR, -1),
-      (0x1AC02800'u32, @[asW, asW, asW], fRRR, -1),
-      (0x9340FC00'u32, @[asX, asX, asImm], fBfmI, -1),
-      (0x13007C00'u32, @[asW, asW, asImm], fBfmI, -1),
+      (0x9AC02800'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x1AC02800'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
+      (0x9340FC00'u32, [asX, asX, asImm, asNone, asNone], fBfmI, -1),
+      (0x13007C00'u32, [asW, asW, asImm, asNone, asNone], fBfmI, -1),
     ]
   of "mul":
     @[
-      (0x0E209C00'u32, @[asVeB, asVeB, asVeB], fVecRRR, -1),
-      (0x0E609C00'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x0EA09C00'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x9B007C00'u32, @[asX, asX, asX], fRRR, -1),
-      (0x1B007C00'u32, @[asW, asW, asW], fRRR, -1),
+      (0x0E209C00'u32, [asVeB, asVeB, asVeB, asNone, asNone], fVecRRR, -1),
+      (0x0E609C00'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x0EA09C00'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x9B007C00'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x1B007C00'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
     ]
   of "madd":
     @[
-      (0x9B000000'u32, @[asX, asX, asX, asX], fRRRR, -1),
-      (0x1B000000'u32, @[asW, asW, asW, asW], fRRRR, -1),
+      (0x9B000000'u32, [asX, asX, asX, asX, asNone], fRRRR, -1),
+      (0x1B000000'u32, [asW, asW, asW, asW, asNone], fRRRR, -1),
     ]
   of "msub":
     @[
-      (0x9B008000'u32, @[asX, asX, asX, asX], fRRRR, -1),
-      (0x1B008000'u32, @[asW, asW, asW, asW], fRRRR, -1),
+      (0x9B008000'u32, [asX, asX, asX, asX, asNone], fRRRR, -1),
+      (0x1B008000'u32, [asW, asW, asW, asW, asNone], fRRRR, -1),
     ]
   of "sdiv":
     @[
-      (0x9AC00C00'u32, @[asX, asX, asX], fRRR, -1),
-      (0x1AC00C00'u32, @[asW, asW, asW], fRRR, -1),
+      (0x9AC00C00'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x1AC00C00'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
     ]
   of "udiv":
     @[
-      (0x9AC00800'u32, @[asX, asX, asX], fRRR, -1),
-      (0x1AC00800'u32, @[asW, asW, asW], fRRR, -1),
+      (0x9AC00800'u32, [asX, asX, asX, asNone, asNone], fRRR, -1),
+      (0x1AC00800'u32, [asW, asW, asW, asNone, asNone], fRRR, -1),
     ]
   of "ldr":
     @[
-      (0xF9400000'u32, @[asX, asMemOff], fMemU, -1),
-      (0xF9400000'u32, @[asX, asMemBase], fMemU, -1),
-      (0xB9400000'u32, @[asW, asMemOff], fMemU, -1),
-      (0xB9400000'u32, @[asW, asMemBase], fMemU, -1),
-      (0xF8400C00'u32, @[asX, asMemPre], fMem9, -1),
-      (0xB8400C00'u32, @[asW, asMemPre], fMem9, -1),
-      (0xF8400400'u32, @[asX, asMemBase, asImm], fMem9, -1),
-      (0xB8400400'u32, @[asW, asMemBase, asImm], fMem9, -1),
-      (0xF8600800'u32, @[asX, asMemIdx], fMemX, -1),
-      (0xB8600800'u32, @[asW, asMemIdx], fMemX, -1),
-      (0x58000000'u32, @[asX, asLbl], fBr, AarchBCond),
-      (0x18000000'u32, @[asW, asLbl], fBr, AarchBCond),
+      (0xF9400000'u32, [asX, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xF9400000'u32, [asX, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xB9400000'u32, [asW, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xB9400000'u32, [asW, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xF8400C00'u32, [asX, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xB8400C00'u32, [asW, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xF8400400'u32, [asX, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xB8400400'u32, [asW, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xF8600800'u32, [asX, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0xB8600800'u32, [asW, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0x58000000'u32, [asX, asLbl, asNone, asNone, asNone], fBr, AarchBCond),
+      (0x18000000'u32, [asW, asLbl, asNone, asNone, asNone], fBr, AarchBCond),
       # SIMD&FP: unsigned-offset scales are the access log2 size
       # (B unscaled, H/1, S/2, D/3, Q/4).
-      (0x3D400000'u32, @[asB, asMemOff], fMemU, -1),
-      (0x3D400000'u32, @[asB, asMemBase], fMemU, -1),
-      (0x7D400000'u32, @[asH, asMemOff], fMemU, -1),
-      (0x7D400000'u32, @[asH, asMemBase], fMemU, -1),
-      (0xBD400000'u32, @[asS, asMemOff], fMemU, -1),
-      (0xBD400000'u32, @[asS, asMemBase], fMemU, -1),
-      (0xFD400000'u32, @[asD, asMemOff], fMemU, -1),
-      (0xFD400000'u32, @[asD, asMemBase], fMemU, -1),
-      (0x3DC00000'u32, @[asQ, asMemOff], fMemU, -1),
-      (0x3DC00000'u32, @[asQ, asMemBase], fMemU, -1),
-      (0x3C400C00'u32, @[asB, asMemPre], fMem9, -1),
-      (0x7C400C00'u32, @[asH, asMemPre], fMem9, -1),
-      (0xBC400C00'u32, @[asS, asMemPre], fMem9, -1),
-      (0xFC400C00'u32, @[asD, asMemPre], fMem9, -1),
-      (0x3CC00C00'u32, @[asQ, asMemPre], fMem9, -1),
-      (0x3C400400'u32, @[asB, asMemBase, asImm], fMem9, -1),
-      (0x7C400400'u32, @[asH, asMemBase, asImm], fMem9, -1),
-      (0xBC400400'u32, @[asS, asMemBase, asImm], fMem9, -1),
-      (0xFC400400'u32, @[asD, asMemBase, asImm], fMem9, -1),
-      (0x3CC00400'u32, @[asQ, asMemBase, asImm], fMem9, -1),
-      (0x3C600800'u32, @[asB, asMemIdx], fMemX, -1),
-      (0x7C600800'u32, @[asH, asMemIdx], fMemX, -1),
-      (0xBC600800'u32, @[asS, asMemIdx], fMemX, -1),
-      (0xFC600800'u32, @[asD, asMemIdx], fMemX, -1),
-      (0x3CE00800'u32, @[asQ, asMemIdx], fMemX, -1),
-      (0x1C000000'u32, @[asS, asLbl], fBr, AarchBCond),
-      (0x5C000000'u32, @[asD, asLbl], fBr, AarchBCond),
-      (0x9C000000'u32, @[asQ, asLbl], fBr, AarchBCond),
+      (0x3D400000'u32, [asB, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0x3D400000'u32, [asB, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0x7D400000'u32, [asH, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0x7D400000'u32, [asH, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xBD400000'u32, [asS, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xBD400000'u32, [asS, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xFD400000'u32, [asD, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xFD400000'u32, [asD, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0x3DC00000'u32, [asQ, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0x3DC00000'u32, [asQ, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0x3C400C00'u32, [asB, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0x7C400C00'u32, [asH, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xBC400C00'u32, [asS, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xFC400C00'u32, [asD, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0x3CC00C00'u32, [asQ, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0x3C400400'u32, [asB, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0x7C400400'u32, [asH, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xBC400400'u32, [asS, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xFC400400'u32, [asD, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0x3CC00400'u32, [asQ, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0x3C600800'u32, [asB, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0x7C600800'u32, [asH, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0xBC600800'u32, [asS, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0xFC600800'u32, [asD, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0x3CE00800'u32, [asQ, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0x1C000000'u32, [asS, asLbl, asNone, asNone, asNone], fBr, AarchBCond),
+      (0x5C000000'u32, [asD, asLbl, asNone, asNone, asNone], fBr, AarchBCond),
+      (0x9C000000'u32, [asQ, asLbl, asNone, asNone, asNone], fBr, AarchBCond),
     ]
   of "str":
     @[
-      (0xF9000000'u32, @[asX, asMemOff], fMemU, -1),
-      (0xF9000000'u32, @[asX, asMemBase], fMemU, -1),
-      (0xB9000000'u32, @[asW, asMemOff], fMemU, -1),
-      (0xB9000000'u32, @[asW, asMemBase], fMemU, -1),
-      (0xF8000C00'u32, @[asX, asMemPre], fMem9, -1),
-      (0xB8000C00'u32, @[asW, asMemPre], fMem9, -1),
-      (0xF8000400'u32, @[asX, asMemBase, asImm], fMem9, -1),
-      (0xB8000400'u32, @[asW, asMemBase, asImm], fMem9, -1),
-      (0xF8200800'u32, @[asX, asMemIdx], fMemX, -1),
-      (0xB8200800'u32, @[asW, asMemIdx], fMemX, -1),
-      (0x3D000000'u32, @[asB, asMemOff], fMemU, -1),
-      (0x3D000000'u32, @[asB, asMemBase], fMemU, -1),
-      (0x7D000000'u32, @[asH, asMemOff], fMemU, -1),
-      (0x7D000000'u32, @[asH, asMemBase], fMemU, -1),
-      (0xBD000000'u32, @[asS, asMemOff], fMemU, -1),
-      (0xBD000000'u32, @[asS, asMemBase], fMemU, -1),
-      (0xFD000000'u32, @[asD, asMemOff], fMemU, -1),
-      (0xFD000000'u32, @[asD, asMemBase], fMemU, -1),
-      (0x3D800000'u32, @[asQ, asMemOff], fMemU, -1),
-      (0x3D800000'u32, @[asQ, asMemBase], fMemU, -1),
-      (0x3C000C00'u32, @[asB, asMemPre], fMem9, -1),
-      (0x7C000C00'u32, @[asH, asMemPre], fMem9, -1),
-      (0xBC000C00'u32, @[asS, asMemPre], fMem9, -1),
-      (0xFC000C00'u32, @[asD, asMemPre], fMem9, -1),
-      (0x3C800C00'u32, @[asQ, asMemPre], fMem9, -1),
-      (0x3C000400'u32, @[asB, asMemBase, asImm], fMem9, -1),
-      (0x7C000400'u32, @[asH, asMemBase, asImm], fMem9, -1),
-      (0xBC000400'u32, @[asS, asMemBase, asImm], fMem9, -1),
-      (0xFC000400'u32, @[asD, asMemBase, asImm], fMem9, -1),
-      (0x3C800400'u32, @[asQ, asMemBase, asImm], fMem9, -1),
-      (0x3C200800'u32, @[asB, asMemIdx], fMemX, -1),
-      (0x7C200800'u32, @[asH, asMemIdx], fMemX, -1),
-      (0xBC200800'u32, @[asS, asMemIdx], fMemX, -1),
-      (0xFC200800'u32, @[asD, asMemIdx], fMemX, -1),
-      (0x3CA00800'u32, @[asQ, asMemIdx], fMemX, -1),
+      (0xF9000000'u32, [asX, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xF9000000'u32, [asX, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xB9000000'u32, [asW, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xB9000000'u32, [asW, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xF8000C00'u32, [asX, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xB8000C00'u32, [asW, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xF8000400'u32, [asX, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xB8000400'u32, [asW, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xF8200800'u32, [asX, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0xB8200800'u32, [asW, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0x3D000000'u32, [asB, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0x3D000000'u32, [asB, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0x7D000000'u32, [asH, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0x7D000000'u32, [asH, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xBD000000'u32, [asS, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xBD000000'u32, [asS, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0xFD000000'u32, [asD, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0xFD000000'u32, [asD, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0x3D800000'u32, [asQ, asMemOff, asNone, asNone, asNone], fMemU, -1),
+      (0x3D800000'u32, [asQ, asMemBase, asNone, asNone, asNone], fMemU, -1),
+      (0x3C000C00'u32, [asB, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0x7C000C00'u32, [asH, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xBC000C00'u32, [asS, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0xFC000C00'u32, [asD, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0x3C800C00'u32, [asQ, asMemPre, asNone, asNone, asNone], fMem9, -1),
+      (0x3C000400'u32, [asB, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0x7C000400'u32, [asH, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xBC000400'u32, [asS, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0xFC000400'u32, [asD, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0x3C800400'u32, [asQ, asMemBase, asImm, asNone, asNone], fMem9, -1),
+      (0x3C200800'u32, [asB, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0x7C200800'u32, [asH, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0xBC200800'u32, [asS, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0xFC200800'u32, [asD, asMemIdx, asNone, asNone, asNone], fMemX, -1),
+      (0x3CA00800'u32, [asQ, asMemIdx, asNone, asNone, asNone], fMemX, -1),
     ]
   of "ldrb":
     @[
       # Byte load, zero-extended into Wt (upper Xt bits cleared by
       # the 32-bit write): LDRB Wt, [Xn{, #imm}] — imm 0-4095.
-      (0x39400000'u32, @[asW, asMemOff], fMemU0, -1),
-      (0x39400000'u32, @[asW, asMemBase], fMemU0, -1),
+      (0x39400000'u32, [asW, asMemOff, asNone, asNone, asNone], fMemU0, -1),
+      (0x39400000'u32, [asW, asMemBase, asNone, asNone, asNone], fMemU0, -1),
     ]
   of "strb":
     @[
       # Byte store from Wt/WZR: STRB Wt, [Xn{, #imm}] — imm 0-4095.
-      (0x39000000'u32, @[asW, asMemOff], fMemU0, -1),
-      (0x39000000'u32, @[asW, asMemBase], fMemU0, -1),
+      (0x39000000'u32, [asW, asMemOff, asNone, asNone, asNone], fMemU0, -1),
+      (0x39000000'u32, [asW, asMemBase, asNone, asNone, asNone], fMemU0, -1),
     ]
   of "ldp":
     @[
-      (0xA9400000'u32, @[asX, asX, asMemOff], fPair, -1),
-      (0xA9400000'u32, @[asX, asX, asMemBase], fPair, -1),
-      (0x29400000'u32, @[asW, asW, asMemOff], fPair, -1),
-      (0x29400000'u32, @[asW, asW, asMemBase], fPair, -1),
-      (0xA9C00000'u32, @[asX, asX, asMemPre], fPair, -1),
-      (0x29C00000'u32, @[asW, asW, asMemPre], fPair, -1),
-      (0xA8C00000'u32, @[asX, asX, asMemBase, asImm], fPair, -1),
-      (0x28C00000'u32, @[asW, asW, asMemBase, asImm], fPair, -1),
+      (0xA9400000'u32, [asX, asX, asMemOff, asNone, asNone], fPair, -1),
+      (0xA9400000'u32, [asX, asX, asMemBase, asNone, asNone], fPair, -1),
+      (0x29400000'u32, [asW, asW, asMemOff, asNone, asNone], fPair, -1),
+      (0x29400000'u32, [asW, asW, asMemBase, asNone, asNone], fPair, -1),
+      (0xA9C00000'u32, [asX, asX, asMemPre, asNone, asNone], fPair, -1),
+      (0x29C00000'u32, [asW, asW, asMemPre, asNone, asNone], fPair, -1),
+      (0xA8C00000'u32, [asX, asX, asMemBase, asImm, asNone], fPair, -1),
+      (0x28C00000'u32, [asW, asW, asMemBase, asImm, asNone], fPair, -1),
     ]
   of "stp":
     @[
-      (0xA9000000'u32, @[asX, asX, asMemOff], fPair, -1),
-      (0xA9000000'u32, @[asX, asX, asMemBase], fPair, -1),
-      (0x29000000'u32, @[asW, asW, asMemOff], fPair, -1),
-      (0x29000000'u32, @[asW, asW, asMemBase], fPair, -1),
-      (0xA9800000'u32, @[asX, asX, asMemPre], fPair, -1),
-      (0x29800000'u32, @[asW, asW, asMemPre], fPair, -1),
-      (0xA8800000'u32, @[asX, asX, asMemBase, asImm], fPair, -1),
-      (0x28800000'u32, @[asW, asW, asMemBase, asImm], fPair, -1),
+      (0xA9000000'u32, [asX, asX, asMemOff, asNone, asNone], fPair, -1),
+      (0xA9000000'u32, [asX, asX, asMemBase, asNone, asNone], fPair, -1),
+      (0x29000000'u32, [asW, asW, asMemOff, asNone, asNone], fPair, -1),
+      (0x29000000'u32, [asW, asW, asMemBase, asNone, asNone], fPair, -1),
+      (0xA9800000'u32, [asX, asX, asMemPre, asNone, asNone], fPair, -1),
+      (0x29800000'u32, [asW, asW, asMemPre, asNone, asNone], fPair, -1),
+      (0xA8800000'u32, [asX, asX, asMemBase, asImm, asNone], fPair, -1),
+      (0x28800000'u32, [asW, asW, asMemBase, asImm, asNone], fPair, -1),
     ]
   of "b":
     @[
-      (0x14000000'u32, @[asLbl], fBr, AarchB),
+      (0x14000000'u32, [asLbl, asNone, asNone, asNone, asNone], fBr, AarchB),
     ]
   of "b.cond":
     @[
       # base ORed with the 4-bit condition at macro expansion time;
       # rel id filled in by the matcher (always BCOND here).
-      (0x54000000'u32, @[asLbl], fBr, AarchBCond),
+      (0x54000000'u32, [asLbl, asNone, asNone, asNone, asNone], fBr, AarchBCond),
     ]
   of "bl":
     @[
-      (0x94000000'u32, @[asLbl], fBr, AarchB),
+      (0x94000000'u32, [asLbl, asNone, asNone, asNone, asNone], fBr, AarchB),
     ]
   of "br":
     @[
-      (0xD61F0000'u32, @[asX], fBrReg, -1),
+      (0xD61F0000'u32, [asX, asNone, asNone, asNone, asNone], fBrReg, -1),
     ]
   of "blr":
     @[
-      (0xD63F0000'u32, @[asX], fBrReg, -1),
+      (0xD63F0000'u32, [asX, asNone, asNone, asNone, asNone], fBrReg, -1),
     ]
   of "ret":
     @[
-      (0xD65F0000'u32, @[asX], fBrReg, -1),
-      (0xD65F03C0'u32, @[], fMisc, -1),
+      (0xD65F0000'u32, [asX, asNone, asNone, asNone, asNone], fBrReg, -1),
+      (0xD65F03C0'u32, [asNone, asNone, asNone, asNone, asNone], fMisc, -1),
     ]
   of "cbz":
     @[
-      (0xB4000000'u32, @[asX, asLbl], fCbx, AarchBCond),
-      (0x34000000'u32, @[asW, asLbl], fCbx, AarchBCond),
+      (0xB4000000'u32, [asX, asLbl, asNone, asNone, asNone], fCbx, AarchBCond),
+      (0x34000000'u32, [asW, asLbl, asNone, asNone, asNone], fCbx, AarchBCond),
     ]
   of "cbnz":
     @[
-      (0xB5000000'u32, @[asX, asLbl], fCbx, AarchBCond),
-      (0x35000000'u32, @[asW, asLbl], fCbx, AarchBCond),
+      (0xB5000000'u32, [asX, asLbl, asNone, asNone, asNone], fCbx, AarchBCond),
+      (0x35000000'u32, [asW, asLbl, asNone, asNone, asNone], fCbx, AarchBCond),
     ]
   of "cset":
     @[
       # CSET Wd, cond = CSINC Wd, WZR, WZR, !cond. The inverted cond
       # field is ORed into the zero cond slot by the matcher (fCSet).
-      (0x1A9F07E0'u32, @[asW, asCond], fCSet, -1),
-      (0x9A9F07E0'u32, @[asX, asCond], fCSet, -1),
+      (0x1A9F07E0'u32, [asW, asCond, asNone, asNone, asNone], fCSet, -1),
+      (0x9A9F07E0'u32, [asX, asCond, asNone, asNone, asNone], fCSet, -1),
     ]
   of "tbz":
     @[
-      (0x36000000'u32, @[asX, asImm, asLbl], fTbx, AarchTbz),
-      (0x36000000'u32, @[asW, asImm, asLbl], fTbx, AarchTbz),
+      (0x36000000'u32, [asX, asImm, asLbl, asNone, asNone], fTbx, AarchTbz),
+      (0x36000000'u32, [asW, asImm, asLbl, asNone, asNone], fTbx, AarchTbz),
     ]
   of "tbnz":
     @[
-      (0x37000000'u32, @[asX, asImm, asLbl], fTbx, AarchTbz),
-      (0x37000000'u32, @[asW, asImm, asLbl], fTbx, AarchTbz),
+      (0x37000000'u32, [asX, asImm, asLbl, asNone, asNone], fTbx, AarchTbz),
+      (0x37000000'u32, [asW, asImm, asLbl, asNone, asNone], fTbx, AarchTbz),
     ]
   of "adr":
     @[
-      (0x10000000'u32, @[asX, asLbl], fAdr, AarchAdr),
+      (0x10000000'u32, [asX, asLbl, asNone, asNone, asNone], fAdr, AarchAdr),
     ]
   of "adrp":
     @[
-      (0x90000000'u32, @[asX, asLbl], fAdr, AarchAdrp),
+      (0x90000000'u32, [asX, asLbl, asNone, asNone, asNone], fAdr, AarchAdrp),
     ]
   of "fmov":
     @[
-      (0x1E204000'u32, @[asS, asS], fRRn, -1),
-      (0x1E604000'u32, @[asD, asD], fRRn, -1),
-      (0x1E201000'u32, @[asS, asFImm], fFmovI, -1),
-      (0x1E601000'u32, @[asD, asFImm], fFmovI, -1),
-      (0x1E270000'u32, @[asS, asW], fRRn, -1),
-      (0x9E670000'u32, @[asD, asX], fRRn, -1),
-      (0x1E260000'u32, @[asW, asS], fRRn, -1),
-      (0x9E660000'u32, @[asX, asD], fRRn, -1),
+      (0x1E204000'u32, [asS, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x1E604000'u32, [asD, asD, asNone, asNone, asNone], fRRn, -1),
+      (0x1E201000'u32, [asS, asFImm, asNone, asNone, asNone], fFmovI, -1),
+      (0x1E601000'u32, [asD, asFImm, asNone, asNone, asNone], fFmovI, -1),
+      (0x1E270000'u32, [asS, asW, asNone, asNone, asNone], fRRn, -1),
+      (0x9E670000'u32, [asD, asX, asNone, asNone, asNone], fRRn, -1),
+      (0x1E260000'u32, [asW, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x9E660000'u32, [asX, asD, asNone, asNone, asNone], fRRn, -1),
     ]
   of "fadd":
     @[
-      (0x1E202800'u32, @[asS, asS, asS], fRRR, -1),
-      (0x1E602800'u32, @[asD, asD, asD], fRRR, -1),
-      (0x0E401400'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x0E20D400'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x0E60D400'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
+      (0x1E202800'u32, [asS, asS, asS, asNone, asNone], fRRR, -1),
+      (0x1E602800'u32, [asD, asD, asD, asNone, asNone], fRRR, -1),
+      (0x0E401400'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x0E20D400'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x0E60D400'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
     ]
   of "fsub":
     @[
-      (0x1E203800'u32, @[asS, asS, asS], fRRR, -1),
-      (0x1E603800'u32, @[asD, asD, asD], fRRR, -1),
-      (0x0EC01400'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x0EA0D400'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x0EE0D400'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
+      (0x1E203800'u32, [asS, asS, asS, asNone, asNone], fRRR, -1),
+      (0x1E603800'u32, [asD, asD, asD, asNone, asNone], fRRR, -1),
+      (0x0EC01400'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x0EA0D400'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x0EE0D400'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
     ]
   of "fmul":
     @[
-      (0x1E200800'u32, @[asS, asS, asS], fRRR, -1),
-      (0x1E600800'u32, @[asD, asD, asD], fRRR, -1),
-      (0x2E401C00'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x2E20DC00'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x2E60DC00'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
+      (0x1E200800'u32, [asS, asS, asS, asNone, asNone], fRRR, -1),
+      (0x1E600800'u32, [asD, asD, asD, asNone, asNone], fRRR, -1),
+      (0x2E401C00'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x2E20DC00'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x2E60DC00'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
     ]
   of "fdiv":
     @[
-      (0x1E201800'u32, @[asS, asS, asS], fRRR, -1),
-      (0x1E601800'u32, @[asD, asD, asD], fRRR, -1),
-      (0x2E403C00'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x2E20FC00'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x2E60FC00'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
+      (0x1E201800'u32, [asS, asS, asS, asNone, asNone], fRRR, -1),
+      (0x1E601800'u32, [asD, asD, asD, asNone, asNone], fRRR, -1),
+      (0x2E403C00'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x2E20FC00'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x2E60FC00'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
     ]
   of "fmax":
     @[
-      (0x1E204800'u32, @[asS, asS, asS], fRRR, -1),
-      (0x1E604800'u32, @[asD, asD, asD], fRRR, -1),
-      (0x0E403400'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x0E20F400'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x0E60F400'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
+      (0x1E204800'u32, [asS, asS, asS, asNone, asNone], fRRR, -1),
+      (0x1E604800'u32, [asD, asD, asD, asNone, asNone], fRRR, -1),
+      (0x0E403400'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x0E20F400'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x0E60F400'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
     ]
   of "fmin":
     @[
-      (0x1E205800'u32, @[asS, asS, asS], fRRR, -1),
-      (0x1E605800'u32, @[asD, asD, asD], fRRR, -1),
-      (0x0EC03400'u32, @[asVeH, asVeH, asVeH], fVecRRR, -1),
-      (0x0EA0F400'u32, @[asVeS, asVeS, asVeS], fVecRRR, -1),
-      (0x0EE0F400'u32, @[asVeD, asVeD, asVeD], fVecRRR, -1),
+      (0x1E205800'u32, [asS, asS, asS, asNone, asNone], fRRR, -1),
+      (0x1E605800'u32, [asD, asD, asD, asNone, asNone], fRRR, -1),
+      (0x0EC03400'u32, [asVeH, asVeH, asVeH, asNone, asNone], fVecRRR, -1),
+      (0x0EA0F400'u32, [asVeS, asVeS, asVeS, asNone, asNone], fVecRRR, -1),
+      (0x0EE0F400'u32, [asVeD, asVeD, asVeD, asNone, asNone], fVecRRR, -1),
     ]
   of "fneg":
     @[
-      (0x1E214000'u32, @[asS, asS], fRRn, -1),
-      (0x1E614000'u32, @[asD, asD], fRRn, -1),
+      (0x1E214000'u32, [asS, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x1E614000'u32, [asD, asD, asNone, asNone, asNone], fRRn, -1),
     ]
   of "fabs":
     @[
-      (0x1E20C000'u32, @[asS, asS], fRRn, -1),
-      (0x1E60C000'u32, @[asD, asD], fRRn, -1),
+      (0x1E20C000'u32, [asS, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x1E60C000'u32, [asD, asD, asNone, asNone, asNone], fRRn, -1),
     ]
   of "fsqrt":
     @[
-      (0x1E21C000'u32, @[asS, asS], fRRn, -1),
-      (0x1E61C000'u32, @[asD, asD], fRRn, -1),
+      (0x1E21C000'u32, [asS, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x1E61C000'u32, [asD, asD, asNone, asNone, asNone], fRRn, -1),
     ]
   of "fcmp":
     @[
-      (0x1E202000'u32, @[asS, asS], fXRR, -1),
-      (0x1E602000'u32, @[asD, asD], fXRR, -1),
-      (0x1E202008'u32, @[asS, asFZero], fFcmp0, -1),
-      (0x1E602008'u32, @[asD, asFZero], fFcmp0, -1),
+      (0x1E202000'u32, [asS, asS, asNone, asNone, asNone], fXRR, -1),
+      (0x1E602000'u32, [asD, asD, asNone, asNone, asNone], fXRR, -1),
+      (0x1E202008'u32, [asS, asFZero, asNone, asNone, asNone], fFcmp0, -1),
+      (0x1E602008'u32, [asD, asFZero, asNone, asNone, asNone], fFcmp0, -1),
     ]
   of "fcmpe":
     @[
-      (0x1E202010'u32, @[asS, asS], fXRR, -1),
-      (0x1E602010'u32, @[asD, asD], fXRR, -1),
-      (0x1E202018'u32, @[asS, asFZero], fFcmp0, -1),
-      (0x1E602018'u32, @[asD, asFZero], fFcmp0, -1),
+      (0x1E202010'u32, [asS, asS, asNone, asNone, asNone], fXRR, -1),
+      (0x1E602010'u32, [asD, asD, asNone, asNone, asNone], fXRR, -1),
+      (0x1E202018'u32, [asS, asFZero, asNone, asNone, asNone], fFcmp0, -1),
+      (0x1E602018'u32, [asD, asFZero, asNone, asNone, asNone], fFcmp0, -1),
     ]
   of "scvtf":
     @[
-      (0x1E220000'u32, @[asS, asW], fRRn, -1),
-      (0x9E220000'u32, @[asS, asX], fRRn, -1),
-      (0x1E620000'u32, @[asD, asW], fRRn, -1),
-      (0x9E620000'u32, @[asD, asX], fRRn, -1),
+      (0x1E220000'u32, [asS, asW, asNone, asNone, asNone], fRRn, -1),
+      (0x9E220000'u32, [asS, asX, asNone, asNone, asNone], fRRn, -1),
+      (0x1E620000'u32, [asD, asW, asNone, asNone, asNone], fRRn, -1),
+      (0x9E620000'u32, [asD, asX, asNone, asNone, asNone], fRRn, -1),
     ]
   of "ucvtf":
     @[
-      (0x1E230000'u32, @[asS, asW], fRRn, -1),
-      (0x9E230000'u32, @[asS, asX], fRRn, -1),
-      (0x1E630000'u32, @[asD, asW], fRRn, -1),
-      (0x9E630000'u32, @[asD, asX], fRRn, -1),
+      (0x1E230000'u32, [asS, asW, asNone, asNone, asNone], fRRn, -1),
+      (0x9E230000'u32, [asS, asX, asNone, asNone, asNone], fRRn, -1),
+      (0x1E630000'u32, [asD, asW, asNone, asNone, asNone], fRRn, -1),
+      (0x9E630000'u32, [asD, asX, asNone, asNone, asNone], fRRn, -1),
     ]
   of "fcvtzs":
     @[
-      (0x1E380000'u32, @[asW, asS], fRRn, -1),
-      (0x9E380000'u32, @[asX, asS], fRRn, -1),
-      (0x1E780000'u32, @[asW, asD], fRRn, -1),
-      (0x9E780000'u32, @[asX, asD], fRRn, -1),
+      (0x1E380000'u32, [asW, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x9E380000'u32, [asX, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x1E780000'u32, [asW, asD, asNone, asNone, asNone], fRRn, -1),
+      (0x9E780000'u32, [asX, asD, asNone, asNone, asNone], fRRn, -1),
     ]
   of "fcvtzu":
     @[
-      (0x1E390000'u32, @[asW, asS], fRRn, -1),
-      (0x9E390000'u32, @[asX, asS], fRRn, -1),
-      (0x1E790000'u32, @[asW, asD], fRRn, -1),
-      (0x9E790000'u32, @[asX, asD], fRRn, -1),
+      (0x1E390000'u32, [asW, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x9E390000'u32, [asX, asS, asNone, asNone, asNone], fRRn, -1),
+      (0x1E790000'u32, [asW, asD, asNone, asNone, asNone], fRRn, -1),
+      (0x9E790000'u32, [asX, asD, asNone, asNone, asNone], fRRn, -1),
     ]
   of "fcvt":
     @[
-      (0x1E624000'u32, @[asS, asD], fRRn, -1),
-      (0x1E22C000'u32, @[asD, asS], fRRn, -1),
+      (0x1E624000'u32, [asS, asD, asNone, asNone, asNone], fRRn, -1),
+      (0x1E22C000'u32, [asD, asS, asNone, asNone, asNone], fRRn, -1),
     ]
   of "dup":
     @[
-      (0x0E010C00'u32, @[asVeB, asW], fDupG, -1),
-      (0x0E010C00'u32, @[asVeB, asX], fDupG, -1),
-      (0x0E020C00'u32, @[asVeH, asW], fDupG, -1),
-      (0x0E020C00'u32, @[asVeH, asX], fDupG, -1),
-      (0x0E040C00'u32, @[asVeS, asW], fDupG, -1),
-      (0x0E040C00'u32, @[asVeS, asX], fDupG, -1),
-      (0x0E080C00'u32, @[asVeD, asW], fDupG, -1),
-      (0x0E080C00'u32, @[asVeD, asX], fDupG, -1),
+      (0x0E010C00'u32, [asVeB, asW, asNone, asNone, asNone], fDupG, -1),
+      (0x0E010C00'u32, [asVeB, asX, asNone, asNone, asNone], fDupG, -1),
+      (0x0E020C00'u32, [asVeH, asW, asNone, asNone, asNone], fDupG, -1),
+      (0x0E020C00'u32, [asVeH, asX, asNone, asNone, asNone], fDupG, -1),
+      (0x0E040C00'u32, [asVeS, asW, asNone, asNone, asNone], fDupG, -1),
+      (0x0E040C00'u32, [asVeS, asX, asNone, asNone, asNone], fDupG, -1),
+      (0x0E080C00'u32, [asVeD, asW, asNone, asNone, asNone], fDupG, -1),
+      (0x0E080C00'u32, [asVeD, asX, asNone, asNone, asNone], fDupG, -1),
     ]
   of "movi":
     @[
-      (0x0F000400'u32, @[asVeS, asImm], fVecMovi, -1),
-      (0x0F000400'u32, @[asVeS, asImm, asMod, asImm], fVecMovi, -1),
-      (0x0F008400'u32, @[asVeH, asImm], fVecMovi, -1),
-      (0x0F008400'u32, @[asVeH, asImm, asMod, asImm], fVecMovi, -1),
-      (0x0F00E400'u32, @[asVeB, asImm], fVecMovi, -1),
-      (0x2F00E400'u32, @[asVeD, asImm], fVecMoviD, -1),
+      (0x0F000400'u32, [asVeS, asImm, asNone, asNone, asNone], fVecMovi, -1),
+      (0x0F000400'u32, [asVeS, asImm, asMod, asImm, asNone], fVecMovi, -1),
+      (0x0F008400'u32, [asVeH, asImm, asNone, asNone, asNone], fVecMovi, -1),
+      (0x0F008400'u32, [asVeH, asImm, asMod, asImm, asNone], fVecMovi, -1),
+      (0x0F00E400'u32, [asVeB, asImm, asNone, asNone, asNone], fVecMovi, -1),
+      (0x2F00E400'u32, [asVeD, asImm, asNone, asNone, asNone], fVecMoviD, -1),
     ]
   of "nop":
     @[
-      (0xD503201F'u32, @[], fMisc, -1),
+      (0xD503201F'u32, [asNone, asNone, asNone, asNone, asNone], fMisc, -1),
     ]
   of "hlt":
     @[
-      (0xD4400000'u32, @[asImm], fHlt, -1),
+      (0xD4400000'u32, [asImm, asNone, asNone, asNone, asNone], fHlt, -1),
     ]
   of "svc":
     @[
-      (0xD4000001'u32, @[asImm], fHlt, -1),
+      (0xD4000001'u32, [asImm, asNone, asNone, asNone, asNone], fHlt, -1),
     ]
   else:
     @[]
 
-proc a64Mnemonics*(): seq[string] =
-  @["mov", "mov.inverted", "mov.logical", "movz", "movn", "movk",
+proc a64Mnemonics*(): array[67, string] =
+  ["mov", "mov.inverted", "mov.logical", "movz", "movn", "movk",
     "add", "adds", "sub", "subs", "cmp", "cmn",
     "and", "orr", "eor", "ands", "tst", "mvn", "neg",
     "lsl", "lsr", "asr", "mul", "madd", "msub", "sdiv", "udiv",

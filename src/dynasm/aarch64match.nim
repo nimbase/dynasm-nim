@@ -386,12 +386,18 @@ proc a64ShapeName(s: A64Shape): string =
   of asMod: "mod"
   of asPre: "pre"
   of asCond: "cond"
+  of asNone: "none"
+proc a64ShapeCount(shapes: openArray[A64Shape]): int =
+  for s in shapes:
+    if s == asNone: break
+    result.inc
 
-proc a64ShapesFit(entry: seq[A64Shape], cls: seq[A64Arg]): bool =
+proc a64ShapesFit(entry: openArray[A64Shape], cls: seq[A64Arg]): bool =
   ## Entry shapes accept the classified args. Like rs Matcher::XSP,
   ## an SP slot also accepts a non-zero plain X/W register.
-  if entry.len != cls.len: return false
-  for i in 0..<entry.len:
+  let n = a64ShapeCount(entry)
+  if n != cls.len: return false
+  for i in 0..<n:
     if entry[i] == cls[i].shape: continue
     if entry[i] == asXSP and cls[i].shape == asX and
         not cls[i].isZero:
@@ -408,10 +414,10 @@ proc a64Mismatch(mn: string, shapes: seq[A64Shape], stmt: NimNode) =
     if forms != "": forms.add("\n")
     forms.add("  " & mn & " ")
     var first = true
-    for s in e.shapes:
+    for i in 0..<a64ShapeCount(e.shapes):
       if not first: forms.add(", ")
       first = false
-      forms.add(a64ShapeName(s))
+      forms.add(a64ShapeName(e.shapes[i]))
   var got = ""
   for i, s in shapes:
     if i > 0: got.add(", ")
