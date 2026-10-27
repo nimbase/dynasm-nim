@@ -315,10 +315,11 @@ proc dynasmAbs*(a: var auto, size: RelocationSize, lr: LabelRef) =
     a.valueReloc(lr.dynId, f, 0, enc2)
 
 # --------------------------------------------------------------------------
-# SSE scalar double. Sizes are implied by the mnemonic (m64); the only
-# explicit sizes involved are the integer sides of the cvt forms.
-# Validation (macro) guarantees xmm/GPR shapes; the encoders trust it
-# like the GPR paths do.
+# SSE scalar double + packed double. Sizes are implied by the mnemonic
+# (m64 for sd, m128 for pd); the only explicit sizes involved are the
+# integer sides of the cvt forms and the optional dqword/oword marker
+# for m128. Validation (macro) guarantees xmm/GPR shapes; the encoders
+# trust it like the GPR paths do.
 # --------------------------------------------------------------------------
 
 proc dynasmMovsd*(a: var auto, dst, src: Operand, isX64: bool) =
@@ -371,8 +372,55 @@ proc dynasmCvttsd2si*(a: var auto, dst, src: Operand, isX64: bool) =
   else:
     raise impossibleRelocation("unsupported cvttsd2si operands")
 
-proc dynasmXorpd*(a: var auto, dst, src: Operand) =
+proc dynasmXorpd*(a: var auto, dst, src: Operand, isX64: bool) =
   if dst.kind == okReg and src.kind == okReg:
     encXorpdRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encXorpdRegMem(a, dst.reg, src.mem, isX64)
   else:
-    raise impossibleRelocation("xorpd only supports reg,reg here")
+    raise impossibleRelocation("unsupported xorpd operands")
+
+proc dynasmMovApd*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encMovApdRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encMovApdRegMem(a, dst.reg, src.mem, isX64)
+  elif dst.kind == okMem and src.kind == okReg:
+    encMovApdMemReg(a, dst.mem, src.reg, isX64)
+  else:
+    raise impossibleRelocation("unsupported movapd operands")
+
+proc dynasmMovUpd*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encMovUpdRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encMovUpdRegMem(a, dst.reg, src.mem, isX64)
+  elif dst.kind == okMem and src.kind == okReg:
+    encMovUpdMemReg(a, dst.mem, src.reg, isX64)
+  else:
+    raise impossibleRelocation("unsupported movupd operands")
+
+proc dynasmAluPd*(a: var auto, mn: string, dst, src: Operand,
+    isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encSsePdAluRegReg(a, mn, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encSsePdAluRegMem(a, mn, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported " & mn & " operands")
+
+proc dynasmAndpd*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encAndpdRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encAndpdRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported andpd operands")
+
+proc dynasmOrpd*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encOrpdRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encOrpdRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported orpd operands")

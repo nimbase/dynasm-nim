@@ -207,6 +207,7 @@ type
     sz16
     sz32
     sz64
+    sz128
 
   LabelRefKind* = enum
     lrForward
@@ -297,6 +298,9 @@ proc byte*(v: int64): Operand = immOp(v, sz8)
 proc word*(v: int64): Operand = immOp(v, sz16)
 proc dword*(v: int64): Operand = immOp(v, sz32)
 proc qword*(v: int64): Operand = immOp(v, sz64)
+proc dqword*(v: int64): Operand = immOp(v, sz128)
+proc oword*(v: int64): Operand = immOp(v, sz128)
+proc xmmword*(v: int64): Operand = immOp(v, sz128)
 
 proc dynLbl*(id: DynamicLabel, off: int = 0): LabelRef =
   LabelRef(isLabel: true, lkind: lrDynamic, lname: "", dynId: int(id),
@@ -318,3 +322,10 @@ proc byte*(m: MemOp): Operand = memOp(m, sz8)
 proc word*(m: MemOp): Operand = memOp(m, sz16)
 proc dword*(m: MemOp): Operand = memOp(m, sz32)
 proc qword*(m: MemOp): Operand = memOp(m, sz64)
+proc dqword*(m: MemOp): Operand = memOp(m, sz128)
+proc oword*(m: MemOp): Operand = memOp(m, sz128)
+proc xmmword*(m: MemOp): Operand = memOp(m, sz128)
+
+proc dqword*(r: Register): Operand = regOp(r, sz128)
+proc oword*(r: Register): Operand = regOp(r, sz128)
+proc xmmword*(r: Register): Operand = regOp(r, sz128)

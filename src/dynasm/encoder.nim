@@ -847,8 +847,9 @@ proc encMovzxRegMem*(a: var auto, dst: Register, mem: MemOp,
   emitMemModRMSIB(a, mem, dst.code and 7, isX64)
 
 # --------------------------------------------------------------------------
-# SSE scalar double: movsd, addsd/subsd/mulsd/divsd/sqrtsd, ucomisd,
-# cvtsi2sd/cvttsd2si, xorpd.
+# SSE scalar double + packed double: movsd, addsd/subsd/mulsd/divsd/
+# sqrtsd, ucomisd, cvtsi2sd/cvttsd2si, movapd/movupd, addpd/subpd/
+# mulpd/divpd/sqrtpd/maxpd/minpd, andpd/orpd/xorpd.
 #
 # REX.W stays clear (these opcodes ignore it) except in the cvt forms
 # where W selects the 32/64-bit integer side. REX.R extends the xmm
@@ -923,6 +924,65 @@ proc encUcomisdRegMem*(a: var auto, lhs: Register, mem: MemOp,
 
 proc encXorpdRegReg*(a: var auto, dst, src: Register) =
   encSseRegReg(a, 0x66'u8, 0x57'u8, dst, src)
+
+proc encXorpdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x57'u8, dst, mem, isX64)
+
+proc ssePdAluOpcode(mn: string): uint8 =
+  case mn
+  of "addpd": 0x58'u8
+  of "subpd": 0x5C'u8
+  of "mulpd": 0x59'u8
+  of "divpd": 0x5E'u8
+  of "sqrtpd": 0x51'u8
+  of "maxpd": 0x5F'u8
+  of "minpd": 0x5D'u8
+  else:
+    raise impossibleRelocation("unknown packed-double ALU " & mn)
+
+proc encSsePdAluRegReg*(a: var auto, mn: string, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, ssePdAluOpcode(mn), dst, src)
+
+proc encSsePdAluRegMem*(a: var auto, mn: string, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, ssePdAluOpcode(mn), dst, mem, isX64)
+
+proc encMovApdRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0x28'u8, dst, src)
+
+proc encMovApdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x28'u8, dst, mem, isX64)
+
+proc encMovApdMemReg*(a: var auto, mem: MemOp, src: Register,
+    isX64: bool) =
+  encSseMemReg(a, 0x66'u8, 0x29'u8, mem, src, isX64)
+
+proc encMovUpdRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0x10'u8, dst, src)
+
+proc encMovUpdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x10'u8, dst, mem, isX64)
+
+proc encMovUpdMemReg*(a: var auto, mem: MemOp, src: Register,
+    isX64: bool) =
+  encSseMemReg(a, 0x66'u8, 0x11'u8, mem, src, isX64)
+
+proc encAndpdRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0x54'u8, dst, src)
+
+proc encAndpdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x54'u8, dst, mem, isX64)
+
+proc encOrpdRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0x56'u8, dst, src)
+
+proc encOrpdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x56'u8, dst, mem, isX64)
 
 proc encCvtsi2sdRegReg*(a: var auto, dst: Register, src: Register,
     srcSize: OpSize) =

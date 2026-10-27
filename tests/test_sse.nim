@@ -2,8 +2,9 @@ import unittest
 import std/math
 import dynasm
 
-# SSE scalar-double backend: byte-exact goldens (host-independent,
-# VecAssembler only) plus execution tests gated by host CPU.
+# SSE scalar-double + packed-double backend: byte-exact goldens
+# (host-independent, VecAssembler only) plus execution tests gated
+# by host CPU.
 
 template rejects(body: untyped) =
   static:
@@ -137,7 +138,7 @@ test "sse operand rules are enforced":
     dynasm ops:
       arch x64
       movsd xmm0, dword [rax]
-  rejects:
+  accepts:
     dynasm ops:
       arch x64
       xorpd xmm0, [rax]
@@ -149,6 +150,151 @@ test "sse operand rules are enforced":
     dynasm ops:
       arch aarch64
       movsd xmm0, xmm1
+  accepts:
+    dynasm ops:
+      arch x64
+      movapd xmm0, xmm1
+  accepts:
+    dynasm ops:
+      arch x64
+      movapd xmm0, dqword [rax]
+  accepts:
+    dynasm ops:
+      arch x64
+      movupd xmm1, oword [rbx + 8]
+  rejects:
+    dynasm ops:
+      arch x64
+      movapd rax, xmm0
+  rejects:
+    dynasm ops:
+      arch x64
+      movapd xmm0, xmm1, xmm2
+  rejects:
+    dynasm ops:
+      arch x64
+      movapd [rax], [rbx]
+  rejects:
+    dynasm ops:
+      arch x64
+      movapd xmm0, qword [rax]
+  rejects:
+    dynasm ops:
+      arch x64
+      movapd xmm0, dword [rax]
+  rejects:
+    dynasm ops:
+      arch x64
+      addpd rax, xmm0
+  rejects:
+    dynasm ops:
+      arch x64
+      addpd xmm0, qword [rax]
+  rejects:
+    dynasm ops:
+      arch x64
+      addpd xmm0, [rax + xmm1]
+  rejects:
+    dynasm ops:
+      arch aarch64
+      movapd xmm0, xmm1
+
+test "sse packed mov encodings":
+  var v = initVecAssembler(0)
+  dynasm v:
+    arch x64
+    movapd xmm0, xmm1
+    movupd xmm0, xmm1
+  check v.finalize() == @[0x66'u8, 0x0F'u8, 0x28'u8, 0xC1'u8,
+    0x66'u8, 0x0F'u8, 0x10'u8, 0xC1'u8]
+  var v2 = initVecAssembler(0)
+  dynasm v2:
+    arch x64
+    movapd xmm8, xmm9
+    movupd xmm8, xmm9
+  check v2.finalize() == @[0x66'u8, 0x45'u8, 0x0F'u8, 0x28'u8, 0xC1'u8,
+    0x66'u8, 0x45'u8, 0x0F'u8, 0x10'u8, 0xC1'u8]
+  var v3 = initVecAssembler(0)
+  dynasm v3:
+    arch x64
+    movapd xmm0, [rax]
+    movapd [rax], xmm1
+    movupd xmm0, [rax + 8]
+    movupd [rax], xmm1
+  check v3.finalize() == @[0x66'u8, 0x0F'u8, 0x28'u8, 0x00'u8,
+    0x66'u8, 0x0F'u8, 0x29'u8, 0x08'u8,
+    0x66'u8, 0x0F'u8, 0x10'u8, 0x40'u8, 0x08'u8,
+    0x66'u8, 0x0F'u8, 0x11'u8, 0x08'u8]
+  var v4 = initVecAssembler(0)
+  dynasm v4:
+    arch x64
+    movupd xmm1, [rbx + rcx*8 + 16]
+    movupd [r8], xmm0
+    movapd xmm0, dqword [rax]
+    movapd xmm1, oword [rbx + 8]
+  check v4.finalize() == @[0x66'u8, 0x0F'u8, 0x10'u8, 0x4C'u8, 0xCB'u8,
+    0x10'u8,
+    0x66'u8, 0x41'u8, 0x0F'u8, 0x11'u8, 0x00'u8,
+    0x66'u8, 0x0F'u8, 0x28'u8, 0x00'u8,
+    0x66'u8, 0x0F'u8, 0x28'u8, 0x4B'u8, 0x08'u8]
+
+test "sse packed alu encodings":
+  var v = initVecAssembler(0)
+  dynasm v:
+    arch x64
+    addpd xmm0, xmm1
+    subpd xmm2, [rdx]
+    mulpd xmm0, xmm0
+    divpd xmm8, xmm9
+    sqrtpd xmm0, xmm1
+    maxpd xmm0, xmm1
+    minpd xmm0, xmm1
+  check v.finalize() == @[0x66'u8, 0x0F'u8, 0x58'u8, 0xC1'u8,
+    0x66'u8, 0x0F'u8, 0x5C'u8, 0x12'u8,
+    0x66'u8, 0x0F'u8, 0x59'u8, 0xC0'u8,
+    0x66'u8, 0x45'u8, 0x0F'u8, 0x5E'u8, 0xC1'u8,
+    0x66'u8, 0x0F'u8, 0x51'u8, 0xC1'u8,
+    0x66'u8, 0x0F'u8, 0x5F'u8, 0xC1'u8,
+    0x66'u8, 0x0F'u8, 0x5D'u8, 0xC1'u8]
+
+test "sse packed logic encodings":
+  var v = initVecAssembler(0)
+  dynasm v:
+    arch x64
+    andpd xmm0, xmm1
+    orpd xmm0, xmm1
+    xorpd xmm0, xmm0
+    xorpd xmm8, xmm15
+  check v.finalize() == @[0x66'u8, 0x0F'u8, 0x54'u8, 0xC1'u8,
+    0x66'u8, 0x0F'u8, 0x56'u8, 0xC1'u8,
+    0x66'u8, 0x0F'u8, 0x57'u8, 0xC0'u8,
+    0x66'u8, 0x45'u8, 0x0F'u8, 0x57'u8, 0xC7'u8]
+  var v2 = initVecAssembler(0)
+  dynasm v2:
+    arch x64
+    andpd xmm0, [rax]
+    orpd xmm1, [rbx + 8]
+    xorpd xmm0, [rax]
+  check v2.finalize() == @[0x66'u8, 0x0F'u8, 0x54'u8, 0x00'u8,
+    0x66'u8, 0x0F'u8, 0x56'u8, 0x4B'u8, 0x08'u8,
+    0x66'u8, 0x0F'u8, 0x57'u8, 0x00'u8]
+
+test "sse packed RIP-relative constant pool":
+  var v = initVecAssembler(0)
+  dynasm v:
+    arch x64
+    global two
+    f64 3.75
+    f64 1.25
+    movapd xmm0, [glob("two")]
+    ret()
+  let code = v.finalize()
+  # 16 bytes of data, then 66 0F 28 05 + rel32(-24), then C3.
+  check code.len == 25
+  check code[16] == 0x66'u8
+  check code[19] == 0x05'u8
+  check code[20] == 0xE8'u8
+  check code[24] == 0xC3'u8
 
 when defined(amd64):
   test "sse executes double add/mul/sqrt":
@@ -228,4 +374,63 @@ when defined(amd64):
     var o = 99.5
     f(addr o)
     check o == 0.0
+    buf.destroy()
+
+  test "sse executes packed add/mul":
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      alias xp, rdi, rcx
+      alias yp, rsi, rdx
+      alias op, rdx, r8
+      movupd xmm0, [xp]
+      movupd xmm1, [yp]
+      addpd xmm0, xmm1
+      mulpd xmm0, xmm1
+      movupd [op], xmm0
+      ret()
+    var buf = a.finalize()
+    type Fn = proc(x, y, outp: pointer) {.cdecl.}
+    let f = cast[Fn](buf.ptrAt(AssemblyOffset(0)))
+    var x = [1.5, 2.0]
+    var y = [2.0, 4.0]
+    var o = [0.0, 0.0]
+    f(addr x, addr y, addr o)
+    check o[0] == (1.5 + 2.0) * 2.0
+    check o[1] == (2.0 + 4.0) * 4.0
+    buf.destroy()
+
+  test "sse executes packed mov/logic":
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      alias xp, rdi, rcx
+      alias yp, rsi, rdx
+      alias op, rdx, r8
+      movupd xmm0, [xp]
+      movupd xmm1, [yp]
+      andpd xmm0, xmm1
+      movupd [op], xmm0
+      movupd xmm0, [xp]
+      orpd xmm0, [yp]
+      movupd xmm1, [yp]
+      xorpd xmm1, [yp]
+      addpd xmm0, xmm1
+      movupd [xp], xmm0
+      ret()
+    var buf = a.finalize()
+    type Fn3 = proc(a, b, o: pointer) {.cdecl.}
+    let f = cast[Fn3](buf.ptrAt(AssemblyOffset(0)))
+    var av = [7.0, 9.0]
+    var bv = [3.0, 5.0]
+    var o = [0.0, 0.0]
+    f(addr av, addr bv, addr o)
+    # andpd of two doubles is a bitwise op; recompute via uint64 bits.
+    proc bits(x: float64): uint64 = cast[uint64](x)
+    proc fromBits(u: uint64): float64 = cast[float64](u)
+    check o[0] == fromBits(bits(7.0) and bits(3.0))
+    check o[1] == fromBits(bits(9.0) and bits(5.0))
+    # orpd([ap]) + zero gives back the OR; stored to [ap].
+    check av[0] == fromBits(bits(7.0) or bits(3.0))
+    check av[1] == fromBits(bits(9.0) or bits(5.0))
     buf.destroy()

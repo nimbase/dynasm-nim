@@ -245,17 +245,19 @@ proc memAst(bracket: NimNode, aliases: Table[string, string]): NimNode =
       ripLabel: LabelRef(isLabel: false))
 
 proc operandAst(node: NimNode, aliases: Table[string, string]): NimNode =
-  # byte/word/dword/qword wrappers, either `byte(x)` call form or
+  # byte/word/dword/qword/dqword wrappers, either `byte(x)` call form or
   # NASM-style `byte [x]` command form
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2:
     let fn = getMn(node[0])
-    if fn in ["byte", "word", "dword", "qword"]:
+    if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
+        "xmmword"]:
       let szName =
         case fn
         of "byte": "sz8"
         of "word": "sz16"
         of "dword": "sz32"
-        else: "sz64"
+        of "qword": "sz64"
+        else: "sz128"
       let szIdent = ident(szName)
       let inner = node[1]
       if inner.kind == nnkIdent and isRegName(inner.strVal, aliases):
@@ -387,11 +389,16 @@ const setccMnemonics = ["seto", "setno", "setb", "setnae", "setc",
   "setpe", "setnp", "setpo", "setl", "setnge", "setge", "setnl",
   "setle", "setng", "setg", "setnle"]
 
-# x64 SSE scalar-double subset (implied m64 memory operands; the cvt
-# forms carry an explicit 32/64-bit integer side).
+# x64 SSE scalar-double + packed-double subset (implied m64/m128 memory
+# operands; the cvt forms carry an explicit 32/64-bit integer side).
 const sseMnemonics = ["movsd", "addsd", "subsd", "mulsd", "divsd",
-  "sqrtsd", "ucomisd", "cvtsi2sd", "cvttsd2si", "xorpd"]
+  "sqrtsd", "ucomisd", "cvtsi2sd", "cvttsd2si", "xorpd",
+  "movapd", "movupd", "addpd", "subpd", "mulpd", "divpd", "sqrtpd",
+  "maxpd", "minpd", "andpd", "orpd"]
 const sseAluMnemonics = ["addsd", "subsd", "mulsd", "divsd", "sqrtsd"]
+const ssePdAluMnemonics = ["addpd", "subpd", "mulpd", "divpd", "sqrtpd",
+  "maxpd", "minpd"]
+const ssePdLogicMnemonics = ["andpd", "orpd", "xorpd"]
 
 const dynasmDirectiveWords = ["arch", "alias", "label", "locallabel",
   "global", "globallabel", "dynamiclabel", "binddyn", "dynlabel", "align",
@@ -571,7 +578,8 @@ proc labelKindDeep(node: NimNode): string =
       return a
     return labelKindDeep(node[2])
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2 and
-      getMn(node[0]) in ["byte", "word", "dword", "qword"]:
+      getMn(node[0]) in ["byte", "word", "dword", "qword", "dqword",
+        "oword", "xmmword"]:
     return labelKindDeep(node[1])
   ""
 
@@ -582,12 +590,14 @@ proc classifyOperand(node: NimNode,
     aliases: Table[string, string]): OpStatic =
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2:
     let fn = getMn(node[0])
-    if fn in ["byte", "word", "dword", "qword"]:
+    if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
+        "xmmword"]:
       let sz = case fn
         of "byte": "sz8"
         of "word": "sz16"
         of "dword": "sz32"
-        else: "sz64"
+        of "qword": "sz64"
+        else: "sz128"
       let inner = classifyOperand(node[1], aliases)
       case inner.kind
       of oskReg:
@@ -660,7 +670,7 @@ proc checkArchNode(node: NimNode, aliases: Table[string, string],
     let fn = getMn(node[0])
     if fn == "qword":
       error("dynasm: 64-bit operands need .arch x64", node)
-    elif fn in ["byte", "word", "dword"]:
+    elif fn in ["byte", "word", "dword", "dqword", "oword", "xmmword"]:
       if node.len == 2:
         checkArchNode(node[1], aliases, curIsX64, stmt)
     elif fn == "rq":
@@ -695,7 +705,8 @@ proc checkGprNode(mn: string, node: NimNode,
     if node.len == 0:
       return
     let fn = getMn(node[0])
-    if fn in ["byte", "word", "dword", "qword"]:
+    if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
+        "xmmword"]:
       if node.len == 2:
         checkGprNode(mn, node[1], aliases, stmt)
     elif fn in ["rq", "rd"]:
@@ -733,14 +744,16 @@ proc rexNeedInfo(node: NimNode,
     return infoFor(ri.code, ri.cls, ri.size)
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2:
     let fn = getMn(node[0])
-    if fn in ["byte", "word", "dword", "qword"] and
+    if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
+        "xmmword"] and
         node[1].kind == nnkIdent and isRegName(node[1].strVal, aliases):
       let ri = resolveRegName(node[1].strVal, aliases)
       let sz = case fn
         of "byte": "sz8"
         of "word": "sz16"
         of "dword": "sz32"
-        else: "sz64"
+        of "qword": "sz64"
+        else: "sz128"
       return infoFor(ri.code, ri.cls, sz)
   if node.kind == nnkCall and node.len == 2 and
       getMn(node[0]) in ["rq", "rd", "rx"]:
@@ -773,9 +786,10 @@ proc sizeName(size: string): string =
   else: "its operand size"
 
 proc unwrapSize(node: NimNode): NimNode =
-  ## Strip one byte/word/dword/qword wrapper layer for literal checks.
+  ## Strip one byte/word/dword/qword/dqword wrapper layer for literal checks.
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2 and
-      getMn(node[0]) in ["byte", "word", "dword", "qword"]:
+      getMn(node[0]) in ["byte", "word", "dword", "qword", "dqword",
+        "oword", "xmmword"]:
     node[1]
   else:
     node
@@ -1082,13 +1096,19 @@ proc isXmmOperand(o: OpStatic): bool =
   o.kind == oskReg and o.cls == "rcXmm"
 
 proc checkSseMemSize(mn: string, o: OpStatic, arg: NimNode,
-    needExplicitInt: bool) =
+    needExplicitInt: bool, is128: bool = false) =
   if needExplicitInt:
     # cvtsi2sd integer width: dword or qword, spelled out.
     if o.size != "sz32" and o.size != "sz64":
       error("dynasm: '" & mn &
         "' needs its integer width spelled out, e.g. " &
         "cvtsi2sd xmm0, dword [rax] or qword [rax]", arg)
+  elif is128:
+    # m128 memory for packed-double: bare or dqword/oword-wrapped.
+    if o.size != "" and o.size != "szNone" and o.size != "sz128":
+      error("dynasm: '" & mn &
+        "' memory must be 16 bytes: use a bare [reg..] or dqword [reg..]",
+        arg)
   else:
     # m64 memory for scalar-double: bare or qword-wrapped.
     if o.size != "" and o.size != "szNone" and o.size != "sz64":
@@ -1104,6 +1124,16 @@ proc validateSseMemReg(mn: string, memArg: NimNode,
       "' memory operand must look like [rbx + 8]; wrap a label in " &
       "[...] for RIP-relative addressing", memArg)
   checkSseMemSize(mn, m, memArg, needExplicitInt = false)
+  rejectXmmInMem(mn, memArg, aliases)
+
+proc validateSseMemReg128(mn: string, memArg: NimNode,
+    aliases: Table[string, string], stmt: NimNode) =
+  let m = classifyOperand(memArg, aliases)
+  if m.kind != oskMem and m.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' memory operand must look like [rbx + 8]; wrap a label in " &
+      "[...] for RIP-relative addressing", memArg)
+  checkSseMemSize(mn, m, memArg, needExplicitInt = false, is128 = true)
   rejectXmmInMem(mn, memArg, aliases)
 
 proc validateMovsd(args: seq[NimNode], aliases: Table[string, string],
@@ -1153,15 +1183,56 @@ proc validateUcomisd(args: seq[NimNode], aliases: Table[string, string],
     stmt: NimNode) =
   validateAluSd("ucomisd", args, aliases, stmt)
 
+proc validateMovPd(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind == oskMem and s.kind == oskMem:
+    error("dynasm: '" & mn & "' cannot move memory to memory", stmt)
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: '" & mn & "' needs an XMM register destination, not a " &
+      "general-purpose one; use mov for GPRs", args[0])
+  if s.kind == oskReg and not isXmmOperand(s):
+    error("dynasm: '" & mn & "' needs an XMM register source, not a " &
+      "general-purpose one", args[1])
+  if s.kind == oskImm or s.kind == oskLabel:
+    error("dynasm: '" & mn & "' needs an XMM register or m128 memory " &
+      "source", args[1])
+  if d.kind == oskImm or d.kind == oskLabel:
+    error("dynasm: '" & mn & "' destination must be an XMM register or " &
+      "m128 memory", args[0])
+  if d.kind == oskMem:
+    validateSseMemReg128(mn, args[0], aliases, stmt)
+  if s.kind == oskMem:
+    validateSseMemReg128(mn, args[1], aliases, stmt)
+
+proc validateAluPd(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind != oskReg and d.kind != oskOther:
+    error("dynasm: '" & mn & "' destination must be an XMM register",
+      args[0])
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: '" & mn &
+      "' destination must be an XMM register like xmm0", args[0])
+  if s.kind == oskMem:
+    validateSseMemReg128(mn, args[1], aliases, stmt)
+  elif s.kind == oskReg:
+    if not isXmmOperand(s):
+      error("dynasm: '" & mn &
+        "' source must be an XMM register or m128 memory", args[1])
+  elif s.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' source must be an XMM register or m128 memory", args[1])
+
+proc validateLogicPd(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  validateAluPd(mn, args, aliases, stmt)
+
 proc validateXorpd(args: seq[NimNode], aliases: Table[string, string],
     stmt: NimNode) =
-  for i in 0..1:
-    let k = classifyOperand(args[i], aliases)
-    if k.kind == oskReg and not isXmmOperand(k):
-      error("dynasm: 'xorpd' needs XMM registers like xmm0", args[i])
-    elif k.kind != oskReg and k.kind != oskOther:
-      error("dynasm: 'xorpd' only supports register, register " &
-        "operands", args[i])
+  validateLogicPd("xorpd", args, aliases, stmt)
 
 proc validateCvtsi2sd(args: seq[NimNode], aliases: Table[string, string],
     stmt: NimNode) =
@@ -1848,6 +1919,46 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       let s = opAst(1)
       result.add(quote do: dynasmCvttsd2si(`o`, `d`, `s`, `isX64Lit`))
       continue
+    elif mn in ["movapd", "movupd"]:
+      if args.len != 2:
+        error(mn & " needs 2 args", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateMovPd(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      if mn == "movapd":
+        result.add(quote do: dynasmMovApd(`o`, `d`, `s`, `isX64Lit`))
+      else:
+        result.add(quote do: dynasmMovUpd(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ssePdAluMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: dst, src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateAluPd(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let mnLit = newLit(mn)
+      result.add(quote do: dynasmAluPd(`o`, `mnLit`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["andpd"]:
+      if args.len != 2:
+        error("andpd needs 2 args", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateLogicPd(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmAndpd(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["orpd"]:
+      if args.len != 2:
+        error("orpd needs 2 args", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateLogicPd(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmOrpd(`o`, `d`, `s`, `isX64Lit`))
+      continue
     elif mn in ["xorpd"]:
       if args.len != 2:
         error("xorpd needs 2 args", stmt)
@@ -1855,7 +1966,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       validateXorpd(args, aliases, stmt)
       let d = opAst(0)
       let s = opAst(1)
-      result.add(quote do: dynasmXorpd(`o`, `d`, `s`))
+      result.add(quote do: dynasmXorpd(`o`, `d`, `s`, `isX64Lit`))
       continue
     elif mn in ["call"]:
       if args.len != 1:
