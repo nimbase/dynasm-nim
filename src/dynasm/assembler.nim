@@ -503,7 +503,11 @@ proc ensureExecCapacity*(a: var Assembler, need: int) =
   if a.committed.len > 0:
     copyMem(nm, unsafeAddr a.committed[0], a.committed.len)
   freeMapping(a.execBuf.mem, a.execBuf.mappedSize)
-  makeExecutable(nm, newSize, 0)
+  makeExecutableNoFlush(nm, newSize)
+  if a.committed.len > 0:
+    # Copied committed bytes need invalidating on the fresh mapping;
+    # scope it to their range instead of the whole (larger) mapping.
+    flushCache(nm, a.committed.len)
   a.execBuf.mem = nm
   a.execBuf.mappedSize = newSize
   # length will be set on commit
@@ -519,7 +523,13 @@ proc commit*(a: var Assembler) =
       unsafeAddr a.staging[0], a.staging.len)
   # On fresh realloc, committed bytes were already copied with adjustment.
   # On in-place grow, managed relocs do not need adjustment (same base).
-  makeExecutable(a.execBuf.mem, a.execBuf.mappedSize, 0)
+  makeExecutableNoFlush(a.execBuf.mem, a.execBuf.mappedSize)
+  if a.staging.len > 0:
+    # Invalidate only the freshly written bytes (AArch64; no-op on
+    # x86, which is coherent). Previously committed bytes were
+    # flushed by their own commit (or by ensureExecCapacity above).
+    flushCache(cast[pointer](cast[int](a.execBuf.mem) + a.committed.len),
+      a.staging.len)
   if a.staging.len > 0:
     let oldLen = a.committed.len
     a.committed.setLen(oldLen + a.staging.len)

@@ -58,7 +58,7 @@ when defined(arm64) or defined(aarch64):
     # with executable mappings in practice.
     proc sys_icache_invalidate(s: pointer,
       len: csize_t) {.importc, header: "<libkern/OSCacheControl.h>".}
-  proc flushCache(s: pointer, len: int) =
+  proc flushCache*(s: pointer, len: int) =
     ## Invalidate the instruction cache over freshly written code.
     ## x86 is coherent and needs nothing; ARM does not speculate
     ## for us.
@@ -70,7 +70,7 @@ when defined(arm64) or defined(aarch64):
       # targeting ARM, so this branch compiles on Linux AArch64.
       {.emit: "__clear_cache(`s`, (char*)(`s`) + `len`);".}
 else:
-  proc flushCache(s: pointer, len: int) {.inline.} =
+  proc flushCache*(s: pointer, len: int) {.inline.} =
     discard
 
 proc pageSize*(): int =
@@ -129,7 +129,10 @@ proc allocWritable*(size: int): tuple[mem: pointer, mapped: int] =
       raise newException(IOError, "mmap failed")
     (m, size)
 
-proc makeExecutable*(mem: pointer, mapped, length: int) =
+proc makeExecutableNoFlush*(mem: pointer, mapped: int) =
+  ## RX transition (and JIT write-gate close on Apple Silicon) without
+  ## any icache maintenance. Pair with a scoped `flushCache` covering
+  ## just the bytes written since the last flush.
   if mem == nil: return
   when defined(windows):
     var oldProtect: WinDword
@@ -145,11 +148,15 @@ proc makeExecutable*(mem: pointer, mapped, length: int) =
   else:
     if mprotect(mem, mapped, PROT_READ or PROT_EXEC) != 0:
       raise newException(IOError, "mprotect RX failed")
+
+proc makeExecutable*(mem: pointer, mapped, length: int) =
+  makeExecutableNoFlush(mem, mapped)
+  if mem == nil: return
   if length > 0:
     flushCache(mem, length)
   else:
-    # Assembler.commit passes length 0 after copying fresh code;
-    # flush the whole mapping (page-granular, tiny in practice).
+    # Callers with no finer range (buffers filled outside
+    # Assembler.commit) flush the whole mapping.
     flushCache(mem, mapped)
 
 proc makeWritable*(mem: pointer, mapped: int) =
@@ -181,7 +188,9 @@ proc newExecutableBuffer*(size: int): ExecutableBuffer =
   if size == 0:
     return ExecutableBuffer(mem: nil, mappedSize: 0, length: 0)
   let (m, mapped) = allocWritable(size)
-  makeExecutable(m, mapped, 0)
+  # Fresh empty buffer: RX transition only, nothing to invalidate yet.
+  # Each commit flushes exactly the bytes it writes.
+  makeExecutableNoFlush(m, mapped)
   ExecutableBuffer(mem: m, mappedSize: mapped, length: 0)
 
 proc newMutableBuffer*(size: int): MutableBuffer =
