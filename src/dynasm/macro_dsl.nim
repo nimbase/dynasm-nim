@@ -1443,7 +1443,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
             var dynasmImm: int64
             if dynasmS.kind == okImm: dynasmImm = dynasmS.imm
             else: raise impossibleRelocation("movabs needs imm src")
-            encMovRegImm(`o`, dynasmD.reg, dynasmImm, sz64))
+            encMovRegImmAbs(`o`, dynasmD.reg, dynasmImm))
       else:
         result.add(quote do:
           dynasmMov(`o`, `d`, `s`, `isX64Lit`))

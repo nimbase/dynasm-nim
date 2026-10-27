@@ -101,5 +101,54 @@ test "dynasm macro mixed Nim code":
     mov rax, val
     ret()
   let code = ops.finalize()
-  # B8 + imm32? Actually mov rax, imm with sz64 => REX.W B8 + imm64
+  # mov rax,42 with sz64 + small imm => 5-byte mov eax,42
+  # (B8 + imm32, zero-extended; no REX.W, no flags touched)
+  check code == @[0xB8'u8, 0x2A'u8, 0x00'u8, 0x00'u8, 0x00'u8, 0xC3'u8]
+
+test "dynasm macro movabs keeps 10-byte form":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch x64
+    movabs rax, 42
+    ret()
+  let code = ops.finalize()
+  # Explicit movabs forces REX.W B8 + imm64 even for small values.
+  check code.len == 11
   check code[0] == 0x48'u8
+  check code[1] == 0xB8'u8
+  check code[10] == 0xC3'u8
+
+test "dynasm macro mov negative imm uses sign-extended form":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch x64
+    mov rax, -1
+    ret()
+  let code = ops.finalize()
+  # mov r/m64, imm32 sign-extended: REX.W C7 /0 id (7 bytes).
+  check code == @[0x48'u8, 0xC7'u8, 0xC0'u8,
+    0xFF'u8, 0xFF'u8, 0xFF'u8, 0xFF'u8, 0xC3'u8]
+
+test "dynasm macro backward jumps auto-shorten":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch x64
+    label loop
+    nop()
+    jmp bwd("loop")
+    ret()
+  let code = ops.finalize()
+  # loop at 0, nop, EB FD (target 0 - end 3 = -3), ret.
+  check code == @[0x90'u8, 0xEB'u8, 0xFD'u8, 0xC3'u8]
+
+test "dynasm macro backward jcc auto-shortens":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch x64
+    label loop
+    nop()
+    jl bwd("loop")
+    ret()
+  let code = ops.finalize()
+  # 7C FD, ret.
+  check code == @[0x90'u8, 0x7C'u8, 0xFD'u8, 0xC3'u8]

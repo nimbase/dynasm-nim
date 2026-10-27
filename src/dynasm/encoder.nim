@@ -4,6 +4,7 @@
 import ./types
 import ./relocations
 import ./registers
+import ./labels
 
 template emitRexIfNeeded*(a: untyped, w, r, x, b: bool,
     extraForce: bool = false) =
@@ -180,6 +181,23 @@ proc encMovRegReg*(a: var auto, dst, src: Register, size: OpSize) =
   a.push(0x8B'u8)
   a.push(modrmByte(3, dst.code and 7, src.code and 7))
 
+proc encMovRegImmAbs*(a: var auto, dst: Register, imm: int64) =
+  ## Unconditional 10-byte REX.W B8+rd io form (true movabs).
+  ## Used for explicit `movabs`; plain `mov` prefers the shorter
+  ## zero/sign-extended forms below when the value allows it.
+  let b = (dst.code and 8) != 0
+  emitRexIfNeeded(a, true, false, false, b)
+  a.push(cast[uint8](0xB8 or (dst.code and 7)))
+  let u = cast[uint64](imm)
+  a.push(cast[uint8](u and 0xFF))
+  a.push(cast[uint8]((u shr 8) and 0xFF))
+  a.push(cast[uint8]((u shr 16) and 0xFF))
+  a.push(cast[uint8]((u shr 24) and 0xFF))
+  a.push(cast[uint8]((u shr 32) and 0xFF))
+  a.push(cast[uint8]((u shr 40) and 0xFF))
+  a.push(cast[uint8]((u shr 48) and 0xFF))
+  a.push(cast[uint8]((u shr 56) and 0xFF))
+
 proc encMovRegImm*(a: var auto, dst: Register, imm: int64, size: OpSize) =
   if size == sz8:
     let b = (dst.code and 8) != 0
@@ -188,6 +206,23 @@ proc encMovRegImm*(a: var auto, dst: Register, imm: int64, size: OpSize) =
       emitRexIfNeeded(a, false, false, false, b, force)
     a.push(cast[uint8](0xB0 or (dst.code and 7)))
     a.push(cast[uint8](imm))
+  elif size == sz64 and imm >= 0 and imm <= 0xFFFF_FFFF'i64:
+    # mov r32, imm32 zero-extends into the full register, so for
+    # non-negative values fitting in 32 bits this 5-byte form is
+    # semantically identical to the 10-byte movabs (and, unlike
+    # xor-zeroing, never touches flags).
+    let b = (dst.code and 8) != 0
+    emitRexIfNeeded(a, false, false, false, b)
+    a.push(cast[uint8](0xB8 or (dst.code and 7)))
+    a.pushU32(cast[uint32](imm))
+  elif size == sz64 and imm >= -0x8000_0000'i64 and imm < 0:
+    # mov r/m64, imm32 sign-extends: identical 7-byte form for
+    # negative values fitting in int32.
+    let b = (dst.code and 8) != 0
+    emitRexIfNeeded(a, true, false, false, b)
+    a.push(0xC7'u8)
+    a.push(modrmByte(3, 0, dst.code and 7))
+    a.pushU32(cast[uint32](imm))
   else:
     if size == sz16:
       a.push(0x66'u8)
@@ -201,9 +236,17 @@ proc encMovRegImm*(a: var auto, dst: Register, imm: int64, size: OpSize) =
     of sz32:
       a.pushU32(cast[uint32](imm))
     of sz64:
+      # Only reachable for values needing all 64 bits (the fast
+      # paths above handle the rest); REX.W + B8 already emitted.
       let u = cast[uint64](imm)
-      for i in 0..<8:
-        a.push(cast[uint8]((u shr (i * 8)) and 0xFF))
+      a.push(cast[uint8](u and 0xFF))
+      a.push(cast[uint8]((u shr 8) and 0xFF))
+      a.push(cast[uint8]((u shr 16) and 0xFF))
+      a.push(cast[uint8]((u shr 24) and 0xFF))
+      a.push(cast[uint8]((u shr 32) and 0xFF))
+      a.push(cast[uint8]((u shr 40) and 0xFF))
+      a.push(cast[uint8]((u shr 48) and 0xFF))
+      a.push(cast[uint8]((u shr 56) and 0xFF))
     else:
       discard
 
@@ -425,7 +468,33 @@ proc encTestRegReg*(a: var auto, lhs, rhs: Register, size: OpSize) =
     a.push(0x85'u8)
   a.push(modrmByte(3, rhs.code and 7, lhs.code and 7))
 
+proc encJmpShort*(a: var auto, lr: LabelRef)
+proc encJccShort*(a: var auto, mn: string, lr: LabelRef)
+
+proc backwardFits8(a: var auto, lr: LabelRef, shortLen: int): bool =
+  ## Auto short-jump eligibility: a backward label reference is already
+  ## bound at emit time, so when the distance from the end of a
+  ## `shortLen`-byte instruction at the current offset fits in int8 we
+  ## can emit the 2-byte short form instead of the 5/6-byte long form.
+  ## Forward/global/dynamic targets are unknown here: callers keep the
+  ## long form for those (single-pass emission, no relaxation).
+  if lr.lkind != lrBackward:
+    return false
+  let pl = a.labels.placeLocalReference(lr.lname)
+  if not pl.found:
+    return false # invalid code: existing error path reports it below
+  var target = 0
+  try:
+    target = int(a.labels.resolveStatic(pl.label)) + lr.loff
+  except DynasmError:
+    return false
+  let delta = target - (int(a.offset()) + shortLen)
+  delta >= -128 and delta <= 127
+
 proc encJmpRel*(a: var auto, lr: LabelRef) =
+  if backwardFits8(a, lr, 2):
+    encJmpShort(a, lr)
+    return
   a.push(0xE9'u8)
   a.push(0'u8); a.push(0'u8); a.push(0'u8); a.push(0'u8)
   let enc = encodeKind(rkRelative, rsDWord)
@@ -486,6 +555,9 @@ proc jccCode(mn: string): uint8 =
 
 proc encJcc*(a: var auto, mn: string, lr: LabelRef) =
   let cc = jccCode(mn)
+  if backwardFits8(a, lr, 2):
+    encJccShort(a, mn, lr)
+    return
   a.push(0x0F'u8)
   a.push(cast[uint8](0x80 or cc))
   a.push(0'u8); a.push(0'u8); a.push(0'u8); a.push(0'u8)
