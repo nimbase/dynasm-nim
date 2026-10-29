@@ -4,7 +4,7 @@ jobs:
   test:
     uses: nimbase/setup-nim-action/.github/workflows/test_clue.yml@main
     with:
-      nim-version: '2.2.10'
+      nim-version: stable
       # macos-15 is ARM64, macos-15-intel is x86_64 (both standard hosted).
       # ARM Linux/Windows ride test-plain below: clue ships no
       # linux-arm64 binary, and its runner trips over file locks on
