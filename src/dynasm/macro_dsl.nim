@@ -2075,7 +2075,12 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
   let dumpText = "dynasm(" & ops.repr & ") expansion (" &
     $result.len & " statements):\n" & result.repr
   let dumpLit = newLit(dumpText)
-  let bodyStmts = result
+  # NOTE (Nim 2.4): `let bodyStmts = result` + `result = newStmtList()`
+  # destroys the aliased node (use-after-free: the old result is freed
+  # on reassignment despite the live alias, so the copy-back loop sees
+  # zero statements and every block assembles to empty code). Deep-copy
+  # to break the alias; blocks are small so the cost is negligible.
+  let bodyStmts = copyNimTree(result)
   result = newStmtList()
   result.add(quote do:
     when defined(dynasmDebug):
