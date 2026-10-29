@@ -388,6 +388,11 @@ const setccMnemonics = ["seto", "setno", "setb", "setnae", "setc",
   "setbe", "setna", "seta", "setnbe", "sets", "setns", "setp",
   "setpe", "setnp", "setpo", "setl", "setnge", "setge", "setnl",
   "setle", "setng", "setg", "setnle"]
+const cmovccMnemonics = ["cmovo", "cmovno", "cmovb", "cmovnae", "cmovc",
+  "cmovnb", "cmovae", "cmovnc", "cmovz", "cmove", "cmovnz", "cmovne",
+  "cmovbe", "cmovna", "cmova", "cmovnbe", "cmovs", "cmovns", "cmovp",
+  "cmovpe", "cmovnp", "cmovpo", "cmovl", "cmovnge", "cmovge", "cmovnl",
+  "cmovle", "cmovng", "cmovg", "cmovnle"]
 
 # x64 SSE scalar-double + packed-double subset (implied m64/m128 memory
 # operands; the cvt forms carry an explicit 32/64-bit integer side).
@@ -456,6 +461,8 @@ proc isDynasmWord(mn: string): bool =
     return true
   if mn in setccMnemonics:
     return true
+  if mn in cmovccMnemonics:
+    return true
   if mn.endsWith("_short") and mn[0..^7] in jccMnemonics:
     return true
   if mn.endsWith("8") and mn.len > 1 and mn[0..^2] in jccMnemonics:
@@ -512,6 +519,10 @@ proc suggestWord(mn: string): string =
     if d > 0 and d <= thresh:
       cands.add((d, w))
   for w in setccMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in cmovccMnemonics:
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
@@ -1052,6 +1063,28 @@ proc validateSetcc(mn: string, args: seq[NimNode],
   elif d.kind != oskOther:
     error("dynasm: '" & mn & "' needs a byte register or memory",
       args[0])
+
+proc validateCmovcc(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  if d.kind == oskReg:
+    if d.size != "" and d.size notin ["sz16", "sz32", "sz64", "szNone"]:
+      error("dynasm: '" & mn & "' dst must be a 16/32/64-bit register",
+        args[0])
+  elif d.kind != oskOther:
+    error("dynasm: '" & mn & "' needs a register destination", args[0])
+  let s = classifyOperand(args[1], aliases)
+  if s.kind in {oskReg, oskMem}:
+    if s.size != "" and s.size notin ["sz16", "sz32", "sz64", "szNone"]:
+      error("dynasm: '" & mn &
+        "' src must be a 16/32/64-bit register or memory", args[1])
+  elif s.kind != oskOther:
+    error("dynasm: '" & mn & "' src must be a register or memory",
+      args[1])
+  if d.kind == oskReg and s.kind in {oskReg, oskMem}:
+    if d.size != "" and d.size != "szNone" and s.size != "" and
+        s.size != "szNone" and d.size != s.size:
+      error("dynasm: '" & mn & "' dst/src size mismatch", stmt)
 
 proc validateLabelRefArg(mn: string, arg: NimNode, stmt: NimNode) =
   if not isLabelRefNode(arg):
@@ -1660,7 +1693,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         if mn in dynasmInstrWords or mn in aluMnemonics or
             mn in shiftMnemonics or mn in divMnemonics or
             mn in jccMnemonics or mn in setccMnemonics or
-            mn in sseMnemonics:
+            mn in cmovccMnemonics or mn in sseMnemonics:
           error("dynasm: '" & mn &
             "' is an x86 instruction; use arch x64/x86 for it", stmt)
         error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
@@ -1812,6 +1845,17 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       let d = opAst(0)
       let mnLit = newLit(mn)
       result.add(quote do: dynasmSetcc(`o`, `mnLit`, `d`, `isX64Lit`))
+      continue
+    elif mn in cmovccMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: dst, src", stmt)
+      validateCommon(mn, args, aliases, curIsX64, stmt)
+      validateCmovcc(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let mnLit = newLit(mn)
+      result.add(quote do: dynasmCmovcc(`o`, `mnLit`, `d`, `s`,
+        `isX64Lit`))
       continue
     elif mn in shiftMnemonics:
       if args.len != 2:

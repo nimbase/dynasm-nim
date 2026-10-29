@@ -613,6 +613,44 @@ proc encSetccMem*(a: var auto, mn: string, mem: MemOp, isX64: bool) =
   a.push(cast[uint8](0x90 or cc))
   emitMemModRMSIB(a, mem, 0, isX64)
 
+# --------------------------------------------------------------------------
+# CMOVcc: conditional move r16/32/64, r/m16/32/64. 0F 4x /r (no byte form)
+# --------------------------------------------------------------------------
+
+proc cmovccCode(mn: string): uint8 =
+  ## CMOVcc shares condition encodings with Jcc: map cmovXX -> jXX.
+  if mn.len > 4 and mn[0..3] == "cmov":
+    return jccCode("j" & mn[4..^1])
+  raise impossibleRelocation("unknown cmovcc " & mn)
+
+proc encCmovRegReg*(a: var auto, mn: string, dst, src: Register,
+    size: OpSize) =
+  if size == sz8:
+    raise impossibleRelocation("cmov needs 16/32/64-bit")
+  if size == sz16:
+    a.push(0x66'u8)
+  let cc = cmovccCode(mn)
+  let w = size == sz64
+  let t = rexForRM(w, dst, src, MemOp(hasBase: false), false)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(cast[uint8](0x40 or cc))
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+
+proc encCmovRegMem*(a: var auto, mn: string, dst: Register, mem: MemOp,
+    size: OpSize, isX64: bool) =
+  if size == sz8:
+    raise impossibleRelocation("cmov needs 16/32/64-bit")
+  if size == sz16:
+    a.push(0x66'u8)
+  let cc = cmovccCode(mn)
+  let w = size == sz64
+  let t = rexForRM(w, dst, Register(code: 0, cls: rcGpr), mem, true)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(cast[uint8](0x40 or cc))
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
 proc encCallRel*(a: var auto, lr: LabelRef) =
   a.push(0xE8'u8)
   a.push(0'u8); a.push(0'u8); a.push(0'u8); a.push(0'u8)

@@ -174,6 +174,26 @@ proc dynasmSetcc*(a: var auto, mn: string, op: Operand, isX64: bool) =
   else:
     raise impossibleRelocation(mn & " needs a byte register or memory")
 
+proc dynasmCmovcc*(a: var auto, mn: string, dst, src: Operand,
+    isX64: bool) =
+  if dst.kind != okReg:
+    raise impossibleRelocation(mn & " needs reg dst")
+  let dstSz = if dst.regSize != szNone: dst.regSize else: sz64
+  if dstSz == sz8:
+    raise impossibleRelocation(mn & " needs 16/32/64-bit dst")
+  if src.kind == okReg:
+    let srcSz = if src.regSize != szNone: src.regSize else: dstSz
+    if srcSz != dstSz:
+      raise impossibleRelocation(mn & " dst/src size mismatch")
+    encCmovRegReg(a, mn, dst.reg, src.reg, dstSz)
+  elif src.kind == okMem:
+    let srcSz = if src.memSize != szNone: src.memSize else: dstSz
+    if srcSz != dstSz:
+      raise impossibleRelocation(mn & " dst/src size mismatch")
+    encCmovRegMem(a, mn, dst.reg, src.mem, dstSz, isX64)
+  else:
+    raise impossibleRelocation(mn & " needs reg/mem src")
+
 proc dynasmShift*(a: var auto, mn: string, dst: Operand, count: Operand,
     isX64: bool) =
   let sz = if dst.kind == okReg and dst.regSize != szNone: dst.regSize

@@ -491,6 +491,41 @@ test "setcc operand rules":
       arch x64
       setg byte [rbx+8]
 
+test "cmovcc operand rules":
+  var ops = initVecAssembler(0)
+  rejects:
+    dynasm ops:
+      arch x64
+      cmovz al, cl
+  rejects:
+    dynasm ops:
+      arch x64
+      cmovnz rax
+  rejects:
+    dynasm ops:
+      arch x64
+      cmovge rax, 5
+  rejects:
+    dynasm ops:
+      arch x64
+      cmovl eax, bx
+  rejects:
+    dynasm ops:
+      arch x64
+      cmova 5, rbx
+  accepts:
+    dynasm ops:
+      arch x64
+      cmovnz rax, r11
+  accepts:
+    dynasm ops:
+      arch x64
+      cmove ecx, dword [rbx]
+  accepts:
+    dynasm ops:
+      arch x64
+      cmovge rcx, [rbx+8]
+
 test "cset rules":
   var ops = initVecAssembler(0)
   rejects:
