@@ -1321,6 +1321,32 @@ proc validateCvttsd2si(args: seq[NimNode], aliases: Table[string, string],
 # Main macro
 # --------------------------------------------------------------------------
 
+const poolDataWords = ["u8", "u16", "u32", "u64", "i8", "i16", "i32",
+  "i64", "f32", "f64", "bytes", "bytecode", "db"]
+  ## Data directives that can start a constant pool after `global`.
+
+proc stmtHead(s: NimNode): string =
+  ## Lowercased head mnemonic of a dynasm-block statement, or "" for
+  ## plain Nim code and shapes without a head ident.
+  if s.kind == nnkCommand and s.len > 0:
+    if s[0].kind == nnkIdent: return s[0].strVal.toLowerAscii
+    if s[0].kind == nnkAccQuoted and s[0].len > 0 and
+        s[0][0].kind == nnkIdent:
+      return s[0][0].strVal.toLowerAscii
+  elif s.kind == nnkCall and s.len > 0:
+    if s[0].kind == nnkIdent: return s[0].strVal.toLowerAscii
+    if s[0].kind == nnkAccQuoted and s[0].len > 0 and
+        s[0][0].kind == nnkIdent:
+      return s[0][0].strVal.toLowerAscii
+  ""
+
+proc nextStmtIsPoolData(body: NimNode, idx: int): bool =
+  ## True when the statement after `body[idx]` starts a data pool.
+  ## Used to 16-byte-align constant pools: packed FP memory operands
+  ## fault on misaligned pools cross-platform, while code labels (which
+  ## are followed by instructions) must keep their exact placement.
+  idx + 1 < body.len and body[idx + 1].stmtHead in poolDataWords
+
 macro dynasm*(ops: untyped, body: untyped): untyped =
   var aliases = initTable[string, string]()
   var globalLabels = initTable[string, bool]()
@@ -1336,7 +1362,8 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
   if body.kind != nnkStmtList:
     error("dynasm body must be a statement list", body)
 
-  for stmt in body:
+  for stmtIdx in 0..<body.len:
+    let stmt = body[stmtIdx]
     # Skip empty
     if stmt.kind == nnkDiscardStmt: continue
     # Handle nnkCommand / nnkCall. Anything else with its own node
@@ -1524,6 +1551,11 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       globalLabels[labelName] = true
       let nm = newLit(args[0].strVal)
       let o = copyNimTree(ops)
+      if nextStmtIsPoolData(body, stmtIdx):
+        # Constant pool follows: align its start to 16 bytes (packed FP
+        # memory operands fault on misaligned pools). Code labels are
+        # followed by instructions, so their placement never changes.
+        result.add(quote do: `o`.align(16))
       result.add(quote do: `o`.globalLabel(`nm`))
       continue
     elif mn in ["dynamiclabel", "binddyn", "dynlabel"]:

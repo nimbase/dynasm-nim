@@ -437,9 +437,9 @@ when defined(amd64):
 
   test "sse executes packed alu from forward constant pool":
     # Forward-glob pool (constants after code): packed ALU straight off
-    # RIP-relative memory. Regression test: this exact shape faulted
-    # with EXC_I386_GPFLT on one AMD Hackintosh while the identical
-    # backward-pool layout and all scalar/mov forms ran fine.
+    # RIP-relative memory. The macro 16-byte-aligns pool starts, which
+    # packed FP memory operands require: misaligned pools faulted with
+    # SIGSEGV/GPFLT on every x64 runner (found via nvg JIT row kernels).
     var a = newAssembler(akX64)
     dynasm a:
       arch x64
