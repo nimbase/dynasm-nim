@@ -434,3 +434,36 @@ when defined(amd64):
     check av[0] == fromBits(bits(7.0) or bits(3.0))
     check av[1] == fromBits(bits(9.0) or bits(5.0))
     buf.destroy()
+
+  test "sse executes packed alu from forward constant pool":
+    # Forward-glob pool (constants after code): packed ALU straight off
+    # RIP-relative memory. Regression test: this exact shape faulted
+    # with EXC_I386_GPFLT on one AMD Hackintosh while the identical
+    # backward-pool layout and all scalar/mov forms ran fine.
+    var a = newAssembler(akX64)
+    dynasm a:
+      arch x64
+      alias op, rdi, rcx
+      movupd xmm0, [glob("plA")]
+      addpd xmm0, [glob("plB")]
+      movupd xmm1, [glob("plA")]
+      mulpd xmm1, [glob("plB")]
+      addpd xmm0, xmm1
+      maxpd xmm0, [glob("plB")]
+      movupd [op], xmm0
+      ret()
+      global plA
+      f64 1.0
+      f64 2.0
+      global plB
+      f64 0.5
+      f64 0.5
+    var buf = a.finalize()
+    type Fn1 = proc(o: pointer) {.cdecl.}
+    let f = cast[Fn1](buf.ptrAt(AssemblyOffset(0)))
+    var o = [0.0, 0.0]
+    f(addr o[0])
+    # (([1,2]+[0.5,0.5]) + ([1,2]*[0.5,0.5])) max [0.5,0.5]
+    check o[0] == 2.0
+    check o[1] == 3.5
+    buf.destroy()
