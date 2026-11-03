@@ -58,22 +58,32 @@ proc buildRegTable(): Table[string, RegInfo] =
   for i in 0..15:
     result["xmm" & $i] = (i, "szNone", "rcXmm")
 
-var regTableCache {.compileTime.}: Table[string, RegInfo]
-var regTableReady {.compileTime.}: bool
-  ## Register lookup, built once per compilation and reused. Previously
-  ## `regTable()` reconstructed this ~100-entry table per operand
-  ## (`isRegName`/`resolveRegName`), which dominated `dynasm` compile
-  ## time in the VM (table inserts are slow there; a 2000-instruction
-  ## block could even exhaust the VM iteration budget). A module-level
-  ## `let` does not work here (macro bodies run in the interpreter and
-  ## cannot read it); `{.compileTime.}` is the memoization idiom.
+var regListCache {.compileTime.}: seq[tuple[name: string, code: int,
+  size: string, cls: string]]
+var regListReady {.compileTime.}: bool
+  ## Register lookup, materialized once per compilation from
+  ## `buildRegTable` (identical membership by construction) and scanned
+  ## in place. Previously `regTable()` returned the memoized table BY
+  ## VALUE, so every `isRegName`/`resolveRegName` call copied ~100
+  ## entries in the VM (~10 copies per asm statement); the scan touches
+  ## no Table values at all. A module-level `let` does not work here
+  ## (macro bodies run in the interpreter and cannot read it);
+  ## `{.compileTime.}` is the memoization idiom.
 
-proc regTable(): Table[string, RegInfo] =
-  if regTableReady:
-    return regTableCache
-  result = buildRegTable()
-  regTableCache = result
-  regTableReady = true
+proc ensureRegList() =
+  if regListReady: return
+  for k, v in buildRegTable():
+    regListCache.add((k, v.code, v.size, v.cls))
+  regListReady = true
+
+proc findReg(name: string): tuple[found: bool, code: int, size: string,
+    cls: string] =
+  ## Copy-free lookup over the compile-time global (already lowercase).
+  ensureRegList()
+  for e in regListCache:
+    if e.name == name:
+      return (true, e.code, e.size, e.cls)
+  (false, 0, "", "")
 
 proc getMn(node: NimNode): string =
   if node.kind == nnkIdent:
@@ -89,14 +99,15 @@ proc isRegName(name: string, aliases: Table[string, string],
   if n in aliases: return true
   if a64mode:
     return a64IsReg(n, aliases)
-  n in regTable()
+  findReg(n).found
 
 proc resolveRegName(name: string,
     aliases: Table[string, string]): RegInfo =
   let n = name.toLowerAscii
   if n in aliases:
     return resolveRegName(aliases[n], aliases)
-  regTable()[n]
+  let f = findReg(n)
+  (f.code, f.size, f.cls)
 
 # --------------------------------------------------------------------------
 # Operand construction (returns NimNode evaluating to Operand)

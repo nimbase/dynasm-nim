@@ -38,26 +38,42 @@ proc buildA64FpRegTable(): Table[string, A64FpInfo] =
     result["d" & $i] = (i, 8)
     result["q" & $i] = (i, 16)
 
-var a64RegTableCache {.compileTime.}: Table[string, A64RegInfo]
-var a64RegTableReady {.compileTime.}: bool
-var a64FpRegTableCache {.compileTime.}: Table[string, A64FpInfo]
-var a64FpRegTableReady {.compileTime.}: bool
-  ## Register lookups, memoized per compilation (same per-operand
-  ## rebuild pathology as `regTable` in macro_dsl; see note there).
+var a64RegListCache {.compileTime.}: seq[tuple[name: string, code: int,
+  is64: bool, sp, zero: bool]]
+var a64RegListReady {.compileTime.}: bool
+var a64FpRegListCache {.compileTime.}: seq[tuple[name: string, code: int,
+  size: int]]
+var a64FpRegListReady {.compileTime.}: bool
+  ## Register lookups, materialized once per compilation from the
+  ## builders above and scanned in place (same by-value-table-copy
+  ## pathology as `regTable` in macro_dsl; see note there).
 
-proc a64RegTable(): Table[string, A64RegInfo] =
-  if a64RegTableReady:
-    return a64RegTableCache
-  result = buildA64RegTable()
-  a64RegTableCache = result
-  a64RegTableReady = true
+proc ensureA64RegLists() =
+  if a64RegListReady and a64FpRegListReady: return
+  if not a64RegListReady:
+    for k, v in buildA64RegTable():
+      a64RegListCache.add((k, v.code, v.is64, v.sp, v.zero))
+    a64RegListReady = true
+  if not a64FpRegListReady:
+    for k, v in buildA64FpRegTable():
+      a64FpRegListCache.add((k, v.code, v.size))
+    a64FpRegListReady = true
 
-proc a64FpRegTable(): Table[string, A64FpInfo] =
-  if a64FpRegTableReady:
-    return a64FpRegTableCache
-  result = buildA64FpRegTable()
-  a64FpRegTableCache = result
-  a64FpRegTableReady = true
+proc findA64Reg(name: string): tuple[found: bool, code: int, is64: bool,
+    sp, zero: bool] =
+  ensureA64RegLists()
+  for e in a64RegListCache:
+    if e.name == name:
+      return (true, e.code, e.is64, e.sp, e.zero)
+  (false, 0, false, false, false)
+
+proc findA64FpReg(name: string): tuple[found: bool, code: int,
+    size: int] =
+  ensureA64RegLists()
+  for e in a64FpRegListCache:
+    if e.name == name:
+      return (true, e.code, e.size)
+  (false, 0, 0)
 
 proc a64Arrangement(suffix: string): tuple[shape: A64Shape, size: int,
     is128: bool] =
@@ -93,11 +109,12 @@ proc a64ResolveIdent(name: string,
 
 proc a64IsReg*(name: string, aliases: Table[string, string]): bool =
   let n = a64ResolveIdent(name, aliases)
-  n in a64RegTable() or n in a64FpRegTable()
+  findA64Reg(n).found or findA64FpReg(n).found
 
 proc a64RegInfoOf*(name: string,
     aliases: Table[string, string]): A64RegInfo =
-  a64RegTable()[a64ResolveIdent(name, aliases)]
+  let f = findA64Reg(a64ResolveIdent(name, aliases))
+  (f.code, f.is64, f.sp, f.zero)
 
 # --------------------------------------------------------------------------
 # Literal helpers
@@ -158,7 +175,7 @@ proc a64RegNode(n: NimNode, aliases: Table[string, string],
     is64: bool] =
   if n.kind == nnkIdent:
     let resolved = a64ResolveIdent(n.strVal, aliases)
-    if resolved in a64FpRegTable():
+    if findA64FpReg(resolved).found:
       error("dynasm: " & what & " must be an integer register", n)
     if not a64IsReg(n.strVal, aliases):
       error("dynasm: " & what & " must be a register", n)
@@ -276,15 +293,15 @@ proc a64Classify(mn: string, node: NimNode,
     aliases: Table[string, string], stmt: NimNode): A64Arg =
   if node.kind == nnkIdent:
     let n = a64ResolveIdent(node.strVal, aliases)
-    if n in a64RegTable():
-      let ri = a64RegTable()[n]
+    let ri = findA64Reg(n)
+    if ri.found:
       let sh =
         if ri.sp: (if ri.is64: asXSP else: asWSP)
         elif ri.is64: asX
         else: asW
       return A64Arg(shape: sh, node: node, isZero: ri.zero)
-    if n in a64FpRegTable():
-      let fi = a64FpRegTable()[n]
+    let fi = findA64FpReg(n)
+    if fi.found:
       let sh =
         case fi.size
         of 1: asB
@@ -615,8 +632,9 @@ proc a64MemScale(shape: A64Shape): int =
 proc regExpr(n: NimNode, aliases: Table[string, string]): NimNode =
   if n.kind == nnkIdent:
     let resolved = a64ResolveIdent(n.strVal, aliases)
-    if resolved in a64FpRegTable():
-      let codeLit = newLit(a64FpRegTable()[resolved].code)
+    let fi = findA64FpReg(resolved)
+    if fi.found:
+      let codeLit = newLit(fi.code)
       return quote do: Register(code: uint8(`codeLit`), cls: rcGpr)
     let ri = a64RegInfoOf(n.strVal, aliases)
     let codeLit = newLit(ri.code)
