@@ -29,7 +29,7 @@ const intLitKinds = {nnkIntLit, nnkInt8Lit, nnkInt16Lit, nnkInt32Lit,
 
 type RegInfo = tuple[code: int, size: string, cls: string]
 
-proc regTable(): Table[string, RegInfo] =
+proc buildRegTable(): Table[string, RegInfo] =
   result = initTable[string, RegInfo]()
   # 64-bit
   for (n, c) in [("rax",0),("rcx",1),("rdx",2),("rbx",3),("rsp",4),
@@ -57,6 +57,23 @@ proc regTable(): Table[string, RegInfo] =
   # xmm
   for i in 0..15:
     result["xmm" & $i] = (i, "szNone", "rcXmm")
+
+var regTableCache {.compileTime.}: Table[string, RegInfo]
+var regTableReady {.compileTime.}: bool
+  ## Register lookup, built once per compilation and reused. Previously
+  ## `regTable()` reconstructed this ~100-entry table per operand
+  ## (`isRegName`/`resolveRegName`), which dominated `dynasm` compile
+  ## time in the VM (table inserts are slow there; a 2000-instruction
+  ## block could even exhaust the VM iteration budget). A module-level
+  ## `let` does not work here (macro bodies run in the interpreter and
+  ## cannot read it); `{.compileTime.}` is the memoization idiom.
+
+proc regTable(): Table[string, RegInfo] =
+  if regTableReady:
+    return regTableCache
+  result = buildRegTable()
+  regTableCache = result
+  regTableReady = true
 
 proc getMn(node: NimNode): string =
   if node.kind == nnkIdent:

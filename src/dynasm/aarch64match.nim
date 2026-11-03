@@ -15,7 +15,7 @@ import ./aarch64
 type
   A64RegInfo = tuple[code: int, is64: bool, sp, zero: bool]
 
-proc a64RegTable(): Table[string, A64RegInfo] =
+proc buildA64RegTable(): Table[string, A64RegInfo] =
   result = initTable[string, A64RegInfo]()
   for i in 0..30:
     result["x" & $i] = (i, true, false, false)
@@ -28,7 +28,7 @@ proc a64RegTable(): Table[string, A64RegInfo] =
 type
   A64FpInfo = tuple[code: int, size: int] ## size in bytes: b1 h2 s4 d8 q16
 
-proc a64FpRegTable(): Table[string, A64FpInfo] =
+proc buildA64FpRegTable(): Table[string, A64FpInfo] =
   ## Scalar SIMD registers, mirroring rs AARCH64_REGISTERS b/h/s/d/q.
   result = initTable[string, A64FpInfo]()
   for i in 0..31:
@@ -37,6 +37,27 @@ proc a64FpRegTable(): Table[string, A64FpInfo] =
     result["s" & $i] = (i, 4)
     result["d" & $i] = (i, 8)
     result["q" & $i] = (i, 16)
+
+var a64RegTableCache {.compileTime.}: Table[string, A64RegInfo]
+var a64RegTableReady {.compileTime.}: bool
+var a64FpRegTableCache {.compileTime.}: Table[string, A64FpInfo]
+var a64FpRegTableReady {.compileTime.}: bool
+  ## Register lookups, memoized per compilation (same per-operand
+  ## rebuild pathology as `regTable` in macro_dsl; see note there).
+
+proc a64RegTable(): Table[string, A64RegInfo] =
+  if a64RegTableReady:
+    return a64RegTableCache
+  result = buildA64RegTable()
+  a64RegTableCache = result
+  a64RegTableReady = true
+
+proc a64FpRegTable(): Table[string, A64FpInfo] =
+  if a64FpRegTableReady:
+    return a64FpRegTableCache
+  result = buildA64FpRegTable()
+  a64FpRegTableCache = result
+  a64FpRegTableReady = true
 
 proc a64Arrangement(suffix: string): tuple[shape: A64Shape, size: int,
     is128: bool] =
