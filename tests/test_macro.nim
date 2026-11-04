@@ -69,6 +69,15 @@ test "dynasm macro data directives":
   check code[0] == 0x90'u8
   check code[1] == 0xCC'u8
 
+test "dynasm macro db takes raw byte lists":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch x64
+    db 0x0F, 0xA2
+    db 0x90
+  let code = ops.finalize()
+  check code == @[0x0F'u8, 0xA2'u8, 0x90'u8]
+
 test "dynasm macro dynamic labels":
   var ops = initVecAssembler(0)
   let myLbl = ops.newDynamicLabel()

@@ -934,6 +934,8 @@ proc sseAluOpcode(mn: string): uint8 =
   of "mulsd": 0x59'u8
   of "divsd": 0x5E'u8
   of "sqrtsd": 0x51'u8
+  of "minsd": 0x5D'u8
+  of "maxsd": 0x5F'u8
   else:
     raise impossibleRelocation("unknown scalar-double ALU " & mn)
 
@@ -1063,3 +1065,338 @@ proc encCvttsd2siRegMem*(a: var auto, dst: Register, dstSize: OpSize,
   a.push(0x0F'u8)
   a.push(0x2C'u8)
   emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
+# --------------------------------------------------------------------------
+# Generic 0F38 / 0F3A forms (AES rounds, pshufb, keygenassist, pclmulqdq).
+# REX handling matches the SSE subset (W stays clear, R extends dst xmm,
+# B/X the mem side).
+# --------------------------------------------------------------------------
+
+proc encSse38RegReg*(a: var auto, opcode: uint8, dst, src: Register) =
+  ## 66 [REX] 0F 38 op /r form.
+  let t = rexForRM(false, dst, src, MemOp(hasBase: false), false)
+  a.push(0x66'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x38'u8)
+  a.push(opcode)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+
+proc encSse38RegMem*(a: var auto, opcode: uint8, dst: Register,
+    mem: MemOp, isX64: bool) =
+  let t = rexForRM(false, dst, Register(code: 0, cls: rcGpr), mem, true)
+  a.push(0x66'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x38'u8)
+  a.push(opcode)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
+proc encSse3ARegReg*(a: var auto, opcode: uint8, dst, src: Register,
+    imm: uint8) =
+  ## 66 [REX] 0F 3A op /r ib form.
+  let t = rexForRM(false, dst, src, MemOp(hasBase: false), false)
+  a.push(0x66'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x3A'u8)
+  a.push(opcode)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+  a.push(imm)
+
+proc encSse3ARegMem*(a: var auto, opcode: uint8, dst: Register,
+    mem: MemOp, imm: uint8, isX64: bool) =
+  let t = rexForRM(false, dst, Register(code: 0, cls: rcGpr), mem, true)
+  a.push(0x66'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x3A'u8)
+  a.push(opcode)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+  a.push(imm)
+
+# --------------------------------------------------------------------------
+# AES-NI (x64 only): single-round instructions + key expansion assist.
+# Encodings: 66 0F 38 DB/DC/DD/DE/DF /r for the five 0F38 forms,
+# 66 0F 3A DF /r ib for keygenassist. REX handling matches the SSE
+# subset (W stays clear, R extends dst xmm, B/X the mem side).
+# --------------------------------------------------------------------------
+
+proc aes38Opcode*(mn: string): uint8 =
+  case mn
+  of "aesenc": 0xDC'u8
+  of "aesenclast": 0xDD'u8
+  of "aesdec": 0xDE'u8
+  of "aesdeclast": 0xDF'u8
+  of "aesimc": 0xDB'u8
+  else:
+    raise impossibleRelocation("unknown AES-NI " & mn)
+
+proc encAes38RegReg*(a: var auto, mn: string, dst, src: Register) =
+  encSse38RegReg(a, aes38Opcode(mn), dst, src)
+
+proc encAes38RegMem*(a: var auto, mn: string, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSse38RegMem(a, aes38Opcode(mn), dst, mem, isX64)
+
+proc encAesKeyGenRegReg*(a: var auto, dst, src: Register, imm: uint8) =
+  encSse3ARegReg(a, 0xDF'u8, dst, src, imm)
+
+proc encAesKeyGenRegMem*(a: var auto, dst: Register, mem: MemOp,
+    imm: uint8, isX64: bool) =
+  encSse3ARegMem(a, 0xDF'u8, dst, mem, imm, isX64)
+
+# --------------------------------------------------------------------------
+# GHASH SSE set (PCLMULQDQ era, legacy prefixes only — no VEX).
+# pshufb (SSSE3 0F38), pshufd, punpcklqdq, por (single-0F), pclmulqdq
+# (0F3A + imm8), and the imm8 shift groups (0F 71/72/73 + /digit + ib).
+# REX handling matches the SSE subset throughout.
+# --------------------------------------------------------------------------
+
+proc encPshufbRegReg*(a: var auto, dst, src: Register) =
+  encSse38RegReg(a, 0x00'u8, dst, src)
+
+proc encPshufbRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSse38RegMem(a, 0x00'u8, dst, mem, isX64)
+
+proc encPclmulRegReg*(a: var auto, dst, src: Register, imm: uint8) =
+  encSse3ARegReg(a, 0x44'u8, dst, src, imm)
+
+proc encPclmulRegMem*(a: var auto, dst: Register, mem: MemOp,
+    imm: uint8, isX64: bool) =
+  encSse3ARegMem(a, 0x44'u8, dst, mem, imm, isX64)
+
+proc encPshufdRegReg*(a: var auto, dst, src: Register, imm: uint8) =
+  ## pshufd xmm, xmm/m128, imm8: 66 0F 70 /r ib.
+  let t = rexForRM(false, dst, src, MemOp(hasBase: false), false)
+  a.push(0x66'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x70'u8)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+  a.push(imm)
+
+proc encPshufdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    imm: uint8, isX64: bool) =
+  let t = rexForRM(false, dst, Register(code: 0, cls: rcGpr), mem, true)
+  a.push(0x66'u8)
+  emitRexIfNeeded(a, t.w, t.r, t.x, t.b, t.force)
+  a.push(0x0F'u8)
+  a.push(0x70'u8)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+  a.push(imm)
+
+proc encPunpcklqdqRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0x6C'u8, dst, src)
+
+proc encPunpcklqdqRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x6C'u8, dst, mem, isX64)
+
+proc encPorRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0xEB'u8, dst, src)
+
+proc encPorRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0xEB'u8, dst, mem, isX64)
+
+proc encPaddRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0xFE'u8, dst, src)
+
+proc encPaddRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0xFE'u8, dst, mem, isX64)
+
+proc shiftGroupDigit*(mn: string): tuple[opcode: uint8, digit: uint8] =
+  ## Imm8 shift groups. NB: /2 is RIGHT (psrl), /6 is LEFT (psll) —
+  ## the reverse of the naive guess; verified against clang. The VEX
+  ## forms share opcodes/digits (only the prefix differs).
+  case mn
+  of "psllq", "vpsllq": (0x73'u8, 6'u8)
+  of "psrlq", "vpsrlq": (0x73'u8, 2'u8)
+  of "pslld", "vpslld": (0x72'u8, 6'u8)
+  of "psrld", "vpsrld": (0x72'u8, 2'u8)
+  else:
+    raise impossibleRelocation("unknown SSE shift " & mn)
+
+proc encSseShiftImmReg*(a: var auto, mn: string, dst: Register,
+    imm: uint8) =
+  ## 66 [REX.B] 0F 7x /digit ib. Dst is xmm-only (no mem form exists).
+  let g = shiftGroupDigit(mn)
+  a.push(0x66'u8)
+  if (dst.code and 8) != 0:
+    emitRexIfNeeded(a, false, false, false, true)
+  a.push(0x0F'u8)
+  a.push(g.opcode)
+  a.push(modrmByte(3, g.digit, dst.code and 7))
+  a.push(imm)
+
+# --------------------------------------------------------------------------
+# VEX prefix + AVX/AVX2/BMI2 instructions (P2).
+#
+# Field assignment (all verified against clang):
+# - 3-operand ALU: dst -> ModRM.reg(+R), src1 -> VEX.vvvv, src2 -> r/m(+B/X).
+# - vpshufd: dst -> reg, src -> r/m, vvvv = 0 (unused).
+# - VEX shifts: dst -> vvvv (!), count digit -> reg, src -> r/m.
+#   VEX shifts take no memory operands (unlike most VEX).
+# - vmovdqu: load dst -> reg / store src -> reg, vvvv = 0.
+# - mulx: HI -> reg, LO -> vvvv, SRC -> r/m; pp=F2, map=0F38, W=size.
+# - 2-byte C5 whenever possible (0F map, no X/B/W); else 3-byte C4.
+# All VEX bit fields (R/X/B/vvvv) are inverted in the encoding.
+# --------------------------------------------------------------------------
+
+proc encVex(a: var auto, map: uint8, w, r, x, b, L: bool, pp, vvvv: uint8) =
+  ## `map` is the 5-bit m-mmmm index (1 = 0F, 2 = 0F38). =
+  let rInv = if r: 0'u8 else: 1'u8
+  let vInv = (not vvvv) and 0xF'u8
+  if map == 0x01'u8 and not x and not b and not w:
+    a.push(0xC5'u8)
+    a.push((rInv shl 7) or (vInv shl 3) or (if L: 4'u8 else: 0'u8) or
+      (pp and 3'u8))
+  else:
+    let xInv = if x: 0'u8 else: 1'u8
+    let bInv = if b: 0'u8 else: 1'u8
+    a.push(0xC4'u8)
+    a.push((rInv shl 7) or (xInv shl 6) or (bInv shl 5) or
+      (map and 0x1F'u8))
+    a.push((if w: 0x80'u8 else: 0'u8) or (vInv shl 3) or
+      (if L: 4'u8 else: 0'u8) or (pp and 3'u8))
+
+proc vexMemBits(mem: MemOp): tuple[x, b: bool] =
+  ((mem.hasIndex and (mem.index.code and 8) != 0),
+    (mem.hasBase and (mem.base.code and 8) != 0))
+
+proc vexArithOpcode*(mn: string): uint8 =
+  case mn
+  of "vpaddd": 0xFE'u8
+  of "vpxor": 0xEF'u8
+  of "vpand": 0xDB'u8
+  of "vpaddq": 0xD4'u8
+  else:
+    raise impossibleRelocation("unknown VEX arith " & mn)
+
+proc encVexArithRegRegReg*(a: var auto, mn: string, dst, s1, s2: Register) =
+  let L = dst.cls == rcYmm
+  encVex(a, 0x01'u8, false, (dst.code and 8) != 0, false,
+    (s2.code and 8) != 0, L, 1'u8, s1.code and 0xF'u8)
+  a.push(vexArithOpcode(mn))
+  a.push(modrmByte(3, dst.code and 7, s2.code and 7))
+
+proc encVexArithRegMem*(a: var auto, mn: string, dst, s1: Register,
+    mem: MemOp, isX64: bool) =
+  let L = dst.cls == rcYmm
+  let (x, b) = vexMemBits(mem)
+  encVex(a, 0x01'u8, false, (dst.code and 8) != 0, x, b, L, 1'u8,
+    s1.code and 0xF'u8)
+  a.push(vexArithOpcode(mn))
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
+proc encVexShufdRegReg*(a: var auto, dst, src: Register, imm: uint8) =
+  let L = dst.cls == rcYmm
+  encVex(a, 0x01'u8, false, (dst.code and 8) != 0, false,
+    (src.code and 8) != 0, L, 1'u8, 0'u8)
+  a.push(0x70'u8)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+  a.push(imm)
+
+proc encVexShufdRegMem*(a: var auto, dst: Register, mem: MemOp,
+    imm: uint8, isX64: bool) =
+  let L = dst.cls == rcYmm
+  let (x, b) = vexMemBits(mem)
+  encVex(a, 0x01'u8, false, (dst.code and 8) != 0, x, b, L, 1'u8, 0'u8)
+  a.push(0x70'u8)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+  a.push(imm)
+
+proc encVexShiftRegReg*(a: var auto, mn: string, dst, src: Register,
+    imm: uint8) =
+  ## VEX shifts: dst travels in VEX.vvvv, the count digit in ModRM.reg.
+  ## No memory form exists.
+  let g = shiftGroupDigit(mn)
+  let L = dst.cls == rcYmm
+  encVex(a, 0x01'u8, false, false, false, (src.code and 8) != 0, L,
+    1'u8, dst.code and 0xF'u8)
+  a.push(g.opcode)
+  a.push(modrmByte(3, g.digit, src.code and 7))
+  a.push(imm)
+
+proc encVexMovRegReg*(a: var auto, dst, src: Register) =
+  ## Canonical reg-reg form uses the load opcode (6F), like movdqa.
+  let L = dst.cls == rcYmm
+  encVex(a, 0x01'u8, false, (dst.code and 8) != 0, false,
+    (src.code and 8) != 0, L, 2'u8, 0'u8)
+  a.push(0x6F'u8)
+  a.push(modrmByte(3, dst.code and 7, src.code and 7))
+
+proc encVexMovRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  let L = dst.cls == rcYmm
+  let (x, b) = vexMemBits(mem)
+  encVex(a, 0x01'u8, false, (dst.code and 8) != 0, x, b, L, 2'u8, 0'u8)
+  a.push(0x6F'u8)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
+
+proc encVexMovMemReg*(a: var auto, mem: MemOp, src: Register,
+    isX64: bool) =
+  let L = src.cls == rcYmm
+  let (x, b) = vexMemBits(mem)
+  encVex(a, 0x01'u8, false, (src.code and 8) != 0, x, b, L, 2'u8, 0'u8)
+  a.push(0x7F'u8)
+  emitMemModRMSIB(a, mem, src.code and 7, isX64)
+
+proc encVzeroupper*(a: var auto) =
+  a.push(0xC5'u8)
+  a.push(0xF8'u8)
+  a.push(0x77'u8)
+
+proc encMulxRegRegReg*(a: var auto, hi, lo, src: Register,
+    is64: bool) =
+  ## MULX: HI -> reg, LO -> vvvv, SRC -> r/m; pp=F2, map=0F38, W=size.
+  encVex(a, 0x02'u8, is64, (hi.code and 8) != 0, false,
+    (src.code and 8) != 0, false, 3'u8, lo.code and 0xF'u8)
+  a.push(0xF6'u8)
+  a.push(modrmByte(3, hi.code and 7, src.code and 7))
+
+proc encMulxRegMem*(a: var auto, hi, lo: Register, mem: MemOp,
+    is64: bool, isX64: bool) =
+  let (x, b) = vexMemBits(mem)
+  encVex(a, 0x02'u8, is64, (hi.code and 8) != 0, x, b, false, 3'u8,
+    lo.code and 0xF'u8)
+  a.push(0xF6'u8)
+  emitMemModRMSIB(a, mem, hi.code and 7, isX64)
+
+# --------------------------------------------------------------------------
+# Integer-SSE moves/logic needed by AES kernels. Thin wrappers over the
+# shared prefix+0F helpers: pxor (66 0F EF), movdqa (66 0F 6F/7F),
+# movdqu (F3 0F 6F/7F). Reg-reg canonical form uses the load opcode.
+# --------------------------------------------------------------------------
+
+proc encPxorRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0xEF'u8, dst, src)
+
+proc encPxorRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0xEF'u8, dst, mem, isX64)
+
+proc encMovdqaRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0x6F'u8, dst, src)
+
+proc encMovdqaRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0x6F'u8, dst, mem, isX64)
+
+proc encMovdqaMemReg*(a: var auto, mem: MemOp, src: Register,
+    isX64: bool) =
+  encSseMemReg(a, 0x66'u8, 0x7F'u8, mem, src, isX64)
+
+proc encMovdquRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0xF3'u8, 0x6F'u8, dst, src)
+
+proc encMovdquRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0xF3'u8, 0x6F'u8, dst, mem, isX64)
+
+proc encMovdquMemReg*(a: var auto, mem: MemOp, src: Register,
+    isX64: bool) =
+  encSseMemReg(a, 0xF3'u8, 0x7F'u8, mem, src, isX64)
