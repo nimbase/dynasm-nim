@@ -662,6 +662,22 @@ proc dynasmVmovdqu*(a: var auto, dst, src: Operand, isX64: bool) =
 proc dynasmVzeroupper*(a: var auto) =
   encVzeroupper(a)
 
+proc dynasmVexShufb*(a: var auto, dst, s1, s2: Operand, isX64: bool) =
+  ## Same operand contract as the VEX arith set (dst, src1, src2/mem
+  ## all XMM/YMM of one width), on the 0F38 map.
+  vexCheckReg(dst, "vpshufb dst")
+  vexCheckReg(s1, "vpshufb src1")
+  vexCheckAgree(dst, s1, s2, "vpshufb")
+  if dst.kind != okReg or s1.kind != okReg:
+    raise impossibleRelocation("vpshufb needs register dst/src1")
+  if s2.kind == okReg:
+    vexCheckReg(s2, "vpshufb src2")
+    encVexShufbRegRegReg(a, dst.reg, s1.reg, s2.reg)
+  elif s2.kind == okMem:
+    encVexShufbRegMem(a, dst.reg, s1.reg, s2.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported vpshufb operands")
+
 proc dynasmCpuid*(a: var auto) =
   encCpuid(a)
 

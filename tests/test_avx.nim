@@ -28,6 +28,9 @@ test "vex arith encodings":
     vpaddd xmm0, xmm1, [rax]
     vpaddd ymm0, ymm1, [rbx + rcx*8 + 16]
     vpand ymm0, ymm1, [rax]
+    vpor xmm0, xmm1, xmm2
+    vpor ymm0, ymm1, ymm2
+    vpor ymm0, ymm1, [rax]
   check v.finalize() == @[0xC5'u8, 0xF1'u8, 0xFE'u8, 0xC2'u8,
     0xC5'u8, 0xF1'u8, 0xEF'u8, 0xC2'u8,
     0xC5'u8, 0xF5'u8, 0xFE'u8, 0xC2'u8,
@@ -37,7 +40,23 @@ test "vex arith encodings":
     0xC4'u8, 0x41'u8, 0x31'u8, 0xDB'u8, 0xC2'u8,
     0xC5'u8, 0xF1'u8, 0xFE'u8, 0x00'u8,
     0xC5'u8, 0xF5'u8, 0xFE'u8, 0x44'u8, 0xCB'u8, 0x10'u8,
-    0xC5'u8, 0xF5'u8, 0xDB'u8, 0x00'u8]
+    0xC5'u8, 0xF5'u8, 0xDB'u8, 0x00'u8,
+    0xC5'u8, 0xF1'u8, 0xEB'u8, 0xC2'u8,
+    0xC5'u8, 0xF5'u8, 0xEB'u8, 0xC2'u8,
+    0xC5'u8, 0xF5'u8, 0xEB'u8, 0x00'u8]
+
+test "vpshufb encodings":
+  var v = initVecAssembler(0)
+  dynasm v:
+    arch x64
+    vpshufb xmm0, xmm1, xmm2
+    vpshufb ymm0, ymm1, ymm2
+    vpshufb ymm0, ymm1, [rax]
+    vpshufb xmm8, xmm9, xmm10
+  check v.finalize() == @[0xC4'u8, 0xE2'u8, 0x71'u8, 0x00'u8, 0xC2'u8,
+    0xC4'u8, 0xE2'u8, 0x75'u8, 0x00'u8, 0xC2'u8,
+    0xC4'u8, 0xE2'u8, 0x75'u8, 0x00'u8, 0x00'u8,
+    0xC4'u8, 0x42'u8, 0x31'u8, 0x00'u8, 0xC2'u8]
 
 test "vpshufd and vex shift encodings":
   var v = initVecAssembler(0)
@@ -145,6 +164,14 @@ test "vex operand rules are enforced":
     dynasm ops:
       arch x64
       mulx rdx, rax, [rbx]
+  accepts:
+    dynasm ops:
+      arch x64
+      vpshufb ymm0, ymm1, ymm2
+  accepts:
+    dynasm ops:
+      arch x64
+      vpshufb xmm0, xmm1, [rax]
   rejects:
     dynasm ops:
       arch x64
@@ -216,11 +243,27 @@ test "vex operand rules are enforced":
   rejects:
     dynasm ops:
       arch x64
+      vpshufb ymm0, ymm1
+  rejects:
+    dynasm ops:
+      arch x64
+      vpshufb xmm0, ymm1, xmm2
+  rejects:
+    dynasm ops:
+      arch x64
+      vpshufb [rax], xmm1, xmm2
+  rejects:
+    dynasm ops:
+      arch x64
       vzeroupper xmm0
   rejects:
     dynasm ops:
       arch aarch64
       vpaddd xmm0, xmm1, xmm2
+  rejects:
+    dynasm ops:
+      arch aarch64
+      vpshufb xmm0, xmm1, xmm2
   rejects:
     dynasm ops:
       arch aarch64
@@ -377,6 +420,17 @@ when defined(amd64):
         vpand xmm0, xmm0, xmm1
         vmovdqu [outptr], xmm0
         ret()
+    elif mn == "vpor":
+      dynasm asmObj:
+        arch x64
+        alias aptr, rdi, rcx
+        alias bptr, rsi, rdx
+        alias outptr, rdx, r8
+        vmovdqu xmm0, [aptr]
+        vmovdqu xmm1, [bptr]
+        vpor xmm0, xmm0, xmm1
+        vmovdqu [outptr], xmm0
+        ret()
     else:
       dynasm asmObj:
         arch x64
@@ -480,6 +534,29 @@ when defined(amd64):
     buf.destroy()
     o
 
+  proc jitVexShufb(x, idx: array[32, uint8]): array[32, uint8] =
+    var asmObj = newAssembler(akX64)
+    var s = x
+    var ix = idx
+    var o: array[32, uint8]
+    dynasm asmObj:
+      arch x64
+      alias inptr, rdi, rcx
+      alias idxptr, rsi, rdx
+      alias outptr, rdx, r8
+      vmovdqu ymm0, [inptr]
+      vmovdqu ymm1, [idxptr]
+      vpshufb ymm0, ymm0, ymm1
+      vmovdqu [outptr], ymm0
+      vzeroupper()
+      ret()
+    var buf = asmObj.finalize()
+    type Fn = proc(a, b, c: pointer) {.cdecl.}
+    let f = cast[Fn](buf.ptrAt(AssemblyOffset(0)))
+    f(addr s, addr ix, addr o)
+    buf.destroy()
+    o
+
   proc jitMulx64(a, b: uint64, useMem: bool): tuple[hi, lo: uint64] =
     var asmObj = newAssembler(akX64)
     var x = a
@@ -555,7 +632,7 @@ when defined(amd64):
       for i in 0 ..< 16:
         a[i] = cast[uint8](i * 17 + 3)
         b[i] = cast[uint8](i * 29 + 7)
-      for mn in ["vpaddd", "vpxor", "vpand", "vpaddq"]:
+      for mn in ["vpaddd", "vpxor", "vpand", "vpaddq", "vpor"]:
         let o = jitVexArith2(a, b, mn)
         if mn == "vpaddq":
           for lane in 0 ..< 2:
@@ -575,6 +652,7 @@ when defined(amd64):
             let sw =
               if mn == "vpaddd": aw + bw
               elif mn == "vpxor": aw xor bw
+              elif mn == "vpor": aw or bw
               else: aw and bw
             let want = packU32le([sw, 0'u32, 0'u32, 0'u32])
             for k in 0 ..< 4:
@@ -628,6 +706,21 @@ when defined(amd64):
             for k in 0 ..< 8:
               check o[8 * half + k] ==
                 cast[uint8]((q shr (8 * k)) and 0xFF'u64)
+    else:
+      skip()
+
+  test "vpshufb matches scalar":
+    if hostHasAvx2():
+      # Byte-reverse each 128-bit lane: idx lane k = 15-k per lane.
+      var x: array[32, uint8]
+      var ix: array[32, uint8]
+      for i in 0 ..< 32:
+        x[i] = cast[uint8](i)
+        ix[i] = cast[uint8](15 - (i and 15) + (i and 16))
+      let o = jitVexShufb(x, ix)
+      for i in 0 ..< 32:
+        let laneBase = i and 16
+        check o[i] == x[laneBase + (15 - (i - laneBase))]
     else:
       skip()
 

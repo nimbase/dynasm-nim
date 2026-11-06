@@ -1271,6 +1271,7 @@ proc vexArithOpcode*(mn: string): uint8 =
   case mn
   of "vpaddd": 0xFE'u8
   of "vpxor": 0xEF'u8
+  of "vpor": 0xEB'u8
   of "vpand": 0xDB'u8
   of "vpaddq": 0xD4'u8
   else:
@@ -1308,6 +1309,24 @@ proc encVexShufdRegMem*(a: var auto, dst: Register, mem: MemOp,
   a.push(0x70'u8)
   emitMemModRMSIB(a, mem, dst.code and 7, isX64)
   a.push(imm)
+
+proc encVexShufbRegRegReg*(a: var auto, dst, s1, s2: Register) =
+  ## VEX.128.66.0F38.00: same 3-operand shape as the arith set, but on
+  ## the 0F38 map (always 3-byte VEX).
+  let L = dst.cls == rcYmm
+  encVex(a, 0x02'u8, false, (dst.code and 8) != 0, false,
+    (s2.code and 8) != 0, L, 1'u8, s1.code and 0xF'u8)
+  a.push(0x00'u8)
+  a.push(modrmByte(3, dst.code and 7, s2.code and 7))
+
+proc encVexShufbRegMem*(a: var auto, dst, s1: Register, mem: MemOp,
+    isX64: bool) =
+  let L = dst.cls == rcYmm
+  let (x, b) = vexMemBits(mem)
+  encVex(a, 0x02'u8, false, (dst.code and 8) != 0, x, b, L, 1'u8,
+    s1.code and 0xF'u8)
+  a.push(0x00'u8)
+  emitMemModRMSIB(a, mem, dst.code and 7, isX64)
 
 proc encVexShiftRegReg*(a: var auto, mn: string, dst, src: Register,
     imm: uint8) =

@@ -460,12 +460,13 @@ const chachaShiftMnemonics = ["pslld", "psrld"]
 
 # P2 VEX (AVX/AVX2/BMI2). Only the listed mnemonics are supported —
 # no general AVX.
-const vexArithMnemonics = ["vpaddd", "vpxor", "vpand", "vpaddq"]
+const vexArithMnemonics = ["vpaddd", "vpxor", "vpand", "vpaddq", "vpor"]
 const vexShufdMnemonic = "vpshufd"
 const vexShiftMnemonics = ["vpslld", "vpsrld", "vpsllq", "vpsrlq"]
 const vexMovMnemonic = "vmovdqu"
 const vexZeroMnemonic = "vzeroupper"
 const mulxMnemonic = "mulx"
+const vexShufbMnemonic = "vpshufb"
 
 # P3 detector mnemonics. Zero-operand system instructions used by
 # runtime feature gates (cpuid leaf queries, xgetbv XCR0 check).
@@ -533,7 +534,8 @@ proc isDynasmWord(mn: string): bool =
     return true
   if mn in vexArithMnemonics or mn == vexShufdMnemonic or
       mn in vexShiftMnemonics or mn == vexMovMnemonic or
-      mn == vexZeroMnemonic or mn == mulxMnemonic:
+      mn == vexZeroMnemonic or mn == mulxMnemonic or
+      mn == vexShufbMnemonic:
     return true
   if mn in detectorMnemonics:
     return true
@@ -646,7 +648,7 @@ proc suggestWord(mn: string): string =
     if d > 0 and d <= thresh:
       cands.add((d, w))
   for w in [vexShufdMnemonic, vexMovMnemonic, vexZeroMnemonic,
-      mulxMnemonic]:
+      mulxMnemonic, vexShufbMnemonic]:
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
@@ -2232,7 +2234,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
             mn in vexArithMnemonics or mn == vexShufdMnemonic or
             mn in vexShiftMnemonics or mn == vexMovMnemonic or
             mn == vexZeroMnemonic or mn == mulxMnemonic or
-            mn in detectorMnemonics:
+            mn == vexShufbMnemonic or mn in detectorMnemonics:
           error("dynasm: '" & mn &
             "' is an x86 instruction; use arch x64/x86 for it", stmt)
         error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
@@ -2732,6 +2734,17 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         error("dynasm: 'vzeroupper' takes no operands", stmt)
       let oo = copyNimTree(ops)
       result.add(quote do: dynasmVzeroupper(`oo`))
+      continue
+    elif mn == vexShufbMnemonic:
+      if args.len != 3:
+        error("vpshufb needs 3 args: dst, src1, src2", stmt)
+      validateVexCommon(mn, args, aliases, curIsX64, stmt)
+      validateVexArith(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s1 = opAst(1)
+      let s2 = opAst(2)
+      result.add(quote do: dynasmVexShufb(`o`, `d`, `s1`, `s2`,
+        `isX64Lit`))
       continue
     elif mn in detectorMnemonics:
       if args.len != 0:
