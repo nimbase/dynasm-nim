@@ -61,6 +61,15 @@ test "sse scalar alu encodings":
     0xF2'u8, 0x45'u8, 0x0F'u8, 0x5E'u8, 0xC1'u8,
     0xF2'u8, 0x0F'u8, 0x51'u8, 0xC1'u8]
 
+test "sse scalar min/max encodings":
+  var v = initVecAssembler(0)
+  dynasm v:
+    arch x64
+    minsd xmm0, xmm1
+    maxsd xmm2, [rdx]
+  check v.finalize() == @[0xF2'u8, 0x0F'u8, 0x5D'u8, 0xC1'u8,
+    0xF2'u8, 0x0F'u8, 0x5F'u8, 0x12'u8]
+
 test "sse ucomisd and xorpd encodings":
   var v = initVecAssembler(0)
   dynasm v:

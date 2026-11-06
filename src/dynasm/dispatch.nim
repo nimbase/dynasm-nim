@@ -444,3 +444,260 @@ proc dynasmOrpd*(a: var auto, dst, src: Operand, isX64: bool) =
     encOrpdRegMem(a, dst.reg, src.mem, isX64)
   else:
     raise impossibleRelocation("unsupported orpd operands")
+
+# --------------------------------------------------------------------------
+# AES-NI + integer-SSE moves/logic for AES kernels. Shapes mirror the
+# packed-double paths: dst is always xmm, src is xmm or m128.
+# --------------------------------------------------------------------------
+
+proc dynasmAes*(a: var auto, mn: string, dst, src: Operand,
+    isX64: bool) =
+  if dst.kind != okReg:
+    raise impossibleRelocation(mn & " needs xmm dst")
+  if src.kind == okReg:
+    encAes38RegReg(a, mn, dst.reg, src.reg)
+  elif src.kind == okMem:
+    encAes38RegMem(a, mn, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported " & mn & " operands")
+
+proc dynasmAesKeyGen*(a: var auto, dst, src: Operand, imm: int64,
+    isX64: bool) =
+  if imm < 0 or imm > 255:
+    raise impossibleRelocation("aeskeygenassist imm8 out of range 0-255")
+  let ib = cast[uint8](imm)
+  if dst.kind != okReg:
+    raise impossibleRelocation("aeskeygenassist needs xmm dst")
+  if src.kind == okReg:
+    encAesKeyGenRegReg(a, dst.reg, src.reg, ib)
+  elif src.kind == okMem:
+    encAesKeyGenRegMem(a, dst.reg, src.mem, ib, isX64)
+  else:
+    raise impossibleRelocation("unsupported aeskeygenassist operands")
+
+proc dynasmPxor*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encPxorRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encPxorRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported pxor operands")
+
+proc dynasmMovdqa*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encMovdqaRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encMovdqaRegMem(a, dst.reg, src.mem, isX64)
+  elif dst.kind == okMem and src.kind == okReg:
+    encMovdqaMemReg(a, dst.mem, src.reg, isX64)
+  else:
+    raise impossibleRelocation("unsupported movdqa operands")
+
+proc dynasmMovdqu*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encMovdquRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encMovdquRegMem(a, dst.reg, src.mem, isX64)
+  elif dst.kind == okMem and src.kind == okReg:
+    encMovdquMemReg(a, dst.mem, src.reg, isX64)
+  else:
+    raise impossibleRelocation("unsupported movdqu operands")
+
+# --------------------------------------------------------------------------
+# GHASH SSE set (PCLMULQDQ era). Shapes mirror the packed-double paths:
+# dst is always xmm, src is xmm or m128; pshufd/pclmulqdq/shifts carry
+# an imm8 (runtime range-checked like aeskeygenassist).
+# --------------------------------------------------------------------------
+
+proc dynasmPshufb*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind != okReg:
+    raise impossibleRelocation("pshufb needs xmm dst")
+  if src.kind == okReg:
+    encPshufbRegReg(a, dst.reg, src.reg)
+  elif src.kind == okMem:
+    encPshufbRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported pshufb operands")
+
+proc dynasmPclmul*(a: var auto, dst, src: Operand, imm: int64,
+    isX64: bool) =
+  if imm < 0 or imm > 255:
+    raise impossibleRelocation("pclmulqdq imm8 out of range 0-255")
+  let ib = cast[uint8](imm)
+  if dst.kind != okReg:
+    raise impossibleRelocation("pclmulqdq needs xmm dst")
+  if src.kind == okReg:
+    encPclmulRegReg(a, dst.reg, src.reg, ib)
+  elif src.kind == okMem:
+    encPclmulRegMem(a, dst.reg, src.mem, ib, isX64)
+  else:
+    raise impossibleRelocation("unsupported pclmulqdq operands")
+
+proc dynasmPshufd*(a: var auto, dst, src: Operand, imm: int64,
+    isX64: bool) =
+  if imm < 0 or imm > 255:
+    raise impossibleRelocation("pshufd imm8 out of range 0-255")
+  let ib = cast[uint8](imm)
+  if dst.kind != okReg:
+    raise impossibleRelocation("pshufd needs xmm dst")
+  if src.kind == okReg:
+    encPshufdRegReg(a, dst.reg, src.reg, ib)
+  elif src.kind == okMem:
+    encPshufdRegMem(a, dst.reg, src.mem, ib, isX64)
+  else:
+    raise impossibleRelocation("unsupported pshufd operands")
+
+proc dynasmPunpcklqdq*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encPunpcklqdqRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encPunpcklqdqRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported punpcklqdq operands")
+
+proc dynasmPor*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encPorRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encPorRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported por operands")
+
+proc dynasmPadd*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encPaddRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encPaddRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported paddd operands")
+
+proc dynasmShiftQ*(a: var auto, mn: string, dst: Operand, imm: int64) =
+  if imm < 0 or imm > 255:
+    raise impossibleRelocation(mn & " imm8 out of range 0-255")
+  if dst.kind != okReg:
+    raise impossibleRelocation(mn & " needs xmm dst")
+  encSseShiftImmReg(a, mn, dst.reg, cast[uint8](imm))
+
+# --------------------------------------------------------------------------
+# VEX (AVX/AVX2/BMI2). Runtime guards mirror the macro validators so
+# dynamic (non-static) operands cannot misassemble.
+# --------------------------------------------------------------------------
+
+proc vexCheckReg(op: Operand, what: string) =
+  if op.kind == okReg and op.reg.cls != rcXmm and op.reg.cls != rcYmm:
+    raise impossibleRelocation(what & " needs XMM/YMM registers")
+
+proc vexCheckAgree(dst, s1, s2: Operand, mn: string) =
+  var cls = rcGpr # placeholder; only vector classes participate
+  var have = false
+  for op in [dst, s1, s2]:
+    if op.kind == okReg and
+        (op.reg.cls == rcXmm or op.reg.cls == rcYmm):
+      if not have:
+        cls = op.reg.cls
+        have = true
+      elif op.reg.cls != cls:
+        raise impossibleRelocation(mn & " cannot mix XMM and YMM")
+
+proc dynasmVexArith*(a: var auto, mn: string, dst, s1, s2: Operand,
+    isX64: bool) =
+  vexCheckReg(dst, mn & " dst")
+  vexCheckReg(s1, mn & " src1")
+  vexCheckAgree(dst, s1, s2, mn)
+  if dst.kind != okReg or s1.kind != okReg:
+    raise impossibleRelocation(mn & " needs register dst/src1")
+  if s2.kind == okReg:
+    vexCheckReg(s2, mn & " src2")
+    encVexArithRegRegReg(a, mn, dst.reg, s1.reg, s2.reg)
+  elif s2.kind == okMem:
+    encVexArithRegMem(a, mn, dst.reg, s1.reg, s2.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported " & mn & " operands")
+
+proc dynasmVexShufd*(a: var auto, dst, src: Operand, imm: int64,
+    isX64: bool) =
+  if imm < 0 or imm > 255:
+    raise impossibleRelocation("vpshufd imm8 out of range 0-255")
+  let ib = cast[uint8](imm)
+  vexCheckReg(dst, "vpshufd dst")
+  if dst.kind != okReg:
+    raise impossibleRelocation("vpshufd needs vector dst")
+  if src.kind == okReg:
+    vexCheckReg(src, "vpshufd src")
+    encVexShufdRegReg(a, dst.reg, src.reg, ib)
+  elif src.kind == okMem:
+    encVexShufdRegMem(a, dst.reg, src.mem, ib, isX64)
+  else:
+    raise impossibleRelocation("unsupported vpshufd operands")
+
+proc dynasmVexShift*(a: var auto, mn: string, dst, src: Operand,
+    imm: int64) =
+  if imm < 0 or imm > 255:
+    raise impossibleRelocation(mn & " imm8 out of range 0-255")
+  let ib = cast[uint8](imm)
+  vexCheckReg(dst, mn & " dst")
+  vexCheckReg(src, mn & " src")
+  if dst.kind != okReg or src.kind != okReg:
+    raise impossibleRelocation(mn & " needs vector regs (no mem form)")
+  if dst.reg.cls != src.reg.cls:
+    raise impossibleRelocation(mn & " cannot mix XMM and YMM")
+  encVexShiftRegReg(a, mn, dst.reg, src.reg, ib)
+
+proc dynasmVmovdqu*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    vexCheckReg(dst, "vmovdqu dst")
+    vexCheckReg(src, "vmovdqu src")
+    if dst.reg.cls != src.reg.cls:
+      raise impossibleRelocation("vmovdqu cannot mix XMM and YMM")
+    encVexMovRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    vexCheckReg(dst, "vmovdqu dst")
+    encVexMovRegMem(a, dst.reg, src.mem, isX64)
+  elif dst.kind == okMem and src.kind == okReg:
+    vexCheckReg(src, "vmovdqu src")
+    encVexMovMemReg(a, dst.mem, src.reg, isX64)
+  else:
+    raise impossibleRelocation("unsupported vmovdqu operands")
+
+proc dynasmVzeroupper*(a: var auto) =
+  encVzeroupper(a)
+
+proc dynasmVexShufb*(a: var auto, dst, s1, s2: Operand, isX64: bool) =
+  ## Same operand contract as the VEX arith set (dst, src1, src2/mem
+  ## all XMM/YMM of one width), on the 0F38 map.
+  vexCheckReg(dst, "vpshufb dst")
+  vexCheckReg(s1, "vpshufb src1")
+  vexCheckAgree(dst, s1, s2, "vpshufb")
+  if dst.kind != okReg or s1.kind != okReg:
+    raise impossibleRelocation("vpshufb needs register dst/src1")
+  if s2.kind == okReg:
+    vexCheckReg(s2, "vpshufb src2")
+    encVexShufbRegRegReg(a, dst.reg, s1.reg, s2.reg)
+  elif s2.kind == okMem:
+    encVexShufbRegMem(a, dst.reg, s1.reg, s2.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported vpshufb operands")
+
+proc dynasmCpuid*(a: var auto) =
+  encCpuid(a)
+
+proc dynasmXgetbv*(a: var auto) =
+  encXgetbv(a)
+
+proc dynasmMulx*(a: var auto, hi, lo, src: Operand, isX64: bool) =
+  if hi.kind != okReg or lo.kind != okReg:
+    raise impossibleRelocation("mulx needs GPR dst regs")
+  for op in [hi, lo]:
+    if op.reg.cls != rcGpr:
+      raise impossibleRelocation("mulx needs GPR dst regs")
+  let is64 =
+    if hi.regSize == sz32 or lo.regSize == sz32: false
+    else: true
+  if src.kind == okReg:
+    if src.reg.cls != rcGpr:
+      raise impossibleRelocation("mulx needs a GPR/mem source")
+    encMulxRegRegReg(a, hi.reg, lo.reg, src.reg, is64)
+  elif src.kind == okMem:
+    encMulxRegMem(a, hi.reg, lo.reg, src.mem, is64, isX64)
+  else:
+    raise impossibleRelocation("unsupported mulx operands")

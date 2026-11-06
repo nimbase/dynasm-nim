@@ -249,7 +249,8 @@ the tail_recursive frame fix):
   add/mul/logical, dup/movi, SIMD loads/stores (byte-exact vs clang)
 - [x] Apple Silicon CI: host-gated execution tests, AArch64 JIT executed on hardware
 - [ ] AArch64 vector reg lists, lane-indexed forms, fixed-point converts
-- [ ] Wider instruction coverage (SSE/AVX, more forms of existing mnemonics)
+- [x] AES-NI (aesenc/last, aesdec/last, aesimc, aeskeygenassist) + pxor/movdqa/movdqu
+- [ ] Wider instruction coverage (AVX, more forms of existing mnemonics)
 - [ ] Position-independent code helpers and jump tables
 - [ ] Optional disassembly dump next to the debug code dump
 - [ ] Published nimble release with API docs

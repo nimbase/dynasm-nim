@@ -57,6 +57,9 @@ proc buildRegTable(): Table[string, RegInfo] =
   # xmm
   for i in 0..15:
     result["xmm" & $i] = (i, "szNone", "rcXmm")
+  # ymm (256-bit AVX)
+  for i in 0..15:
+    result["ymm" & $i] = (i, "szNone", "rcYmm")
 
 var regListCache {.compileTime.}: seq[tuple[name: string, code: int,
   size: string, cls: string]]
@@ -189,7 +192,7 @@ proc memAst(bracket: NimNode, aliases: Table[string, string]): NimNode =
       indexNode = regN
       scaleVal = sc
     elif t.kind == nnkCall and t.len >= 1 and
-        getMn(t[0]) in ["rq", "rd", "rx"]:
+        getMn(t[0]) in ["rq", "rd", "rx", "ry"]:
       # dynamic reg as base/index: treat as base if none else index*1
       if baseNode == nil and sg == 1:
         baseNode = t
@@ -278,13 +281,14 @@ proc operandAst(node: NimNode, aliases: Table[string, string]): NimNode =
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2:
     let fn = getMn(node[0])
     if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
-        "xmmword"]:
+        "xmmword", "ymmword", "yword"]:
       let szName =
         case fn
         of "byte": "sz8"
         of "word": "sz16"
         of "dword": "sz32"
         of "qword": "sz64"
+        of "ymmword", "yword": "sz256"
         else: "sz128"
       let szIdent = ident(szName)
       let inner = node[1]
@@ -300,7 +304,7 @@ proc operandAst(node: NimNode, aliases: Table[string, string]): NimNode =
         return quote do:
           memOp(`m`, `szIdent`)
       elif inner.kind == nnkCall and inner.len >= 1 and
-          getMn(inner[0]) in ["rq", "rd", "rx"]:
+          getMn(inner[0]) in ["rq", "rd", "rx", "ry"]:
         return quote do:
           regOp(`inner`, `szIdent`)
       else:
@@ -325,7 +329,7 @@ proc operandAst(node: NimNode, aliases: Table[string, string]): NimNode =
   # dynamic reg Rq/Rd/Rx
   if node.kind == nnkCall and node.len == 2:
     let fn = getMn(node[0])
-    if fn in ["rq", "rd", "rx"]:
+    if fn in ["rq", "rd", "rx", "ry"]:
       let szIdent =
         if fn == "rq": ident("sz64")
         elif fn == "rd": ident("sz32")
@@ -425,13 +429,48 @@ const cmovccMnemonics = ["cmovo", "cmovno", "cmovb", "cmovnae", "cmovc",
 # x64 SSE scalar-double + packed-double subset (implied m64/m128 memory
 # operands; the cvt forms carry an explicit 32/64-bit integer side).
 const sseMnemonics = ["movsd", "addsd", "subsd", "mulsd", "divsd",
-  "sqrtsd", "ucomisd", "cvtsi2sd", "cvttsd2si", "xorpd",
+  "sqrtsd", "minsd", "maxsd", "ucomisd", "cvtsi2sd", "cvttsd2si", "xorpd",
   "movapd", "movupd", "addpd", "subpd", "mulpd", "divpd", "sqrtpd",
   "maxpd", "minpd", "andpd", "orpd"]
-const sseAluMnemonics = ["addsd", "subsd", "mulsd", "divsd", "sqrtsd"]
+const sseAluMnemonics = ["addsd", "subsd", "mulsd", "divsd", "sqrtsd",
+  "minsd", "maxsd"]
 const ssePdAluMnemonics = ["addpd", "subpd", "mulpd", "divpd", "sqrtpd",
   "maxpd", "minpd"]
 const ssePdLogicMnemonics = ["andpd", "orpd", "xorpd"]
+
+# AES-NI (x64 only, no VEX/AVX forms) + integer-SSE moves/logic used by
+# AES kernels. Kept separate from the FP SSE tables so validators and
+# error messages can name the right operand shapes.
+const aesMnemonics = ["aesenc", "aesenclast", "aesdec", "aesdeclast",
+  "aesimc"]
+const aesKeyGenMnemonic = "aeskeygenassist"
+const aesIntMnemonics = ["pxor", "movdqa", "movdqu"]
+
+# GHASH SSE set (PCLMULQDQ era, legacy prefixes only). Split by operand
+# shape: two-operand vector forms, imm8-carrying forms, and the imm8
+# group shifts (xmm dst only — no mem form exists).
+const ghashVecMnemonics = ["pshufb", "punpcklqdq", "por"]
+const ghashImmMnemonics = ["pclmulqdq", "pshufd"]
+const ghashShiftMnemonics = ["psllq", "psrlq"]
+
+# P1 ChaCha SSE2 (4-lane kernel): integer add + dword shifts. Same
+# operand shapes as the GHASH set, so they share validators/dispatch.
+const chachaVecMnemonics = ["paddd"]
+const chachaShiftMnemonics = ["pslld", "psrld"]
+
+# P2 VEX (AVX/AVX2/BMI2). Only the listed mnemonics are supported —
+# no general AVX.
+const vexArithMnemonics = ["vpaddd", "vpxor", "vpand", "vpaddq", "vpor"]
+const vexShufdMnemonic = "vpshufd"
+const vexShiftMnemonics = ["vpslld", "vpsrld", "vpsllq", "vpsrlq"]
+const vexMovMnemonic = "vmovdqu"
+const vexZeroMnemonic = "vzeroupper"
+const mulxMnemonic = "mulx"
+const vexShufbMnemonic = "vpshufb"
+
+# P3 detector mnemonics. Zero-operand system instructions used by
+# runtime feature gates (cpuid leaf queries, xgetbv XCR0 check).
+const detectorMnemonics = ["cpuid", "xgetbv"]
 
 const dynasmDirectiveWords = ["arch", "alias", "label", "locallabel",
   "global", "globallabel", "dynamiclabel", "binddyn", "dynlabel", "align",
@@ -484,6 +523,21 @@ proc isDynasmWord(mn: string): bool =
   if mn in aluMnemonics or mn in shiftMnemonics or mn in divMnemonics:
     return true
   if mn in sseMnemonics:
+    return true
+  if mn in aesMnemonics or mn == aesKeyGenMnemonic or
+      mn in aesIntMnemonics:
+    return true
+  if mn in ghashVecMnemonics or mn in ghashImmMnemonics or
+      mn in ghashShiftMnemonics:
+    return true
+  if mn in chachaVecMnemonics or mn in chachaShiftMnemonics:
+    return true
+  if mn in vexArithMnemonics or mn == vexShufdMnemonic or
+      mn in vexShiftMnemonics or mn == vexMovMnemonic or
+      mn == vexZeroMnemonic or mn == mulxMnemonic or
+      mn == vexShufbMnemonic:
+    return true
+  if mn in detectorMnemonics:
     return true
   if mn in jccMnemonics:
     return true
@@ -558,6 +612,54 @@ proc suggestWord(mn: string): string =
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
+  for w in aesMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  let dk = editDistance(mn, aesKeyGenMnemonic)
+  if dk > 0 and dk <= thresh:
+    cands.add((dk, aesKeyGenMnemonic))
+  for w in aesIntMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in ghashVecMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in ghashImmMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in ghashShiftMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in chachaVecMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in chachaShiftMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in vexArithMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in [vexShufdMnemonic, vexMovMnemonic, vexZeroMnemonic,
+      mulxMnemonic, vexShufbMnemonic]:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in vexShiftMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in detectorMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
   if cands.len == 0:
     return ""
   let top = min(3, cands.len)
@@ -618,7 +720,7 @@ proc labelKindDeep(node: NimNode): string =
     return labelKindDeep(node[2])
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2 and
       getMn(node[0]) in ["byte", "word", "dword", "qword", "dqword",
-        "oword", "xmmword"]:
+        "oword", "xmmword", "ymmword", "yword"]:
     return labelKindDeep(node[1])
   ""
 
@@ -630,12 +732,13 @@ proc classifyOperand(node: NimNode,
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2:
     let fn = getMn(node[0])
     if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
-        "xmmword"]:
+        "xmmword", "ymmword", "yword"]:
       let sz = case fn
         of "byte": "sz8"
         of "word": "sz16"
         of "dword": "sz32"
         of "qword": "sz64"
+        of "ymmword", "yword": "sz256"
         else: "sz128"
       let inner = classifyOperand(node[1], aliases)
       case inner.kind
@@ -666,6 +769,9 @@ proc classifyOperand(node: NimNode,
     of "rx":
       return OpStatic(kind: oskReg, code: -1, size: "szNone",
         cls: "rcXmm")
+    of "ry":
+      return OpStatic(kind: oskReg, code: -1, size: "szNone",
+        cls: "rcYmm")
     else: discard
   let lk = labelKindDeep(node)
   if lk != "":
@@ -731,29 +837,29 @@ proc checkArchNode(node: NimNode, aliases: Table[string, string],
 
 proc checkGprNode(mn: string, node: NimNode,
     aliases: Table[string, string], stmt: NimNode) =
-  ## Our subset is integer-only: static XMM operands are rejected here
+  ## Our subset is integer-only: static vector operands are rejected here
   ## instead of misassembling downstream.
   case node.kind
   of nnkIdent:
     if isRegName(node.strVal, aliases):
       if resolveRegName(node.strVal, aliases).cls != "rcGpr":
         error("dynasm: '" & mn &
-          "' needs general-purpose registers (xmm needs an SSE " &
-          "mnemonic like movsd/addsd)", node)
+          "' needs general-purpose registers (xmm/ymm need a vector " &
+          "mnemonic like movsd/addsd or vpaddd)", node)
   of nnkCall, nnkCommand:
     if node.len == 0:
       return
     let fn = getMn(node[0])
     if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
-        "xmmword"]:
+        "xmmword", "ymmword", "yword"]:
       if node.len == 2:
         checkGprNode(mn, node[1], aliases, stmt)
     elif fn in ["rq", "rd"]:
       discard
-    elif fn == "rx":
+    elif fn in ["rx", "ry"]:
       error("dynasm: '" & mn &
-        "' needs general-purpose registers (xmm needs an SSE " &
-        "mnemonic like movsd/addsd)", node)
+        "' needs general-purpose registers (xmm/ymm need a vector " &
+        "mnemonic like movsd/addsd or vpaddd)", node)
     elif fn in ["fwd", "bwd", "glob", "globalref", "dyn", "dynlbl",
         "dynamic", "extaddr", "externaddr", "mem"]:
       discard
@@ -784,7 +890,7 @@ proc rexNeedInfo(node: NimNode,
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2:
     let fn = getMn(node[0])
     if fn in ["byte", "word", "dword", "qword", "dqword", "oword",
-        "xmmword"] and
+        "xmmword", "ymmword", "yword"] and
         node[1].kind == nnkIdent and isRegName(node[1].strVal, aliases):
       let ri = resolveRegName(node[1].strVal, aliases)
       let sz = case fn
@@ -792,10 +898,11 @@ proc rexNeedInfo(node: NimNode,
         of "word": "sz16"
         of "dword": "sz32"
         of "qword": "sz64"
+        of "ymmword", "yword": "sz256"
         else: "sz128"
       return infoFor(ri.code, ri.cls, sz)
   if node.kind == nnkCall and node.len == 2 and
-      getMn(node[0]) in ["rq", "rd", "rx"]:
+      getMn(node[0]) in ["rq", "rd", "rx", "ry"]:
     return (true, false, false)
   (false, false, false)
 
@@ -828,7 +935,7 @@ proc unwrapSize(node: NimNode): NimNode =
   ## Strip one byte/word/dword/qword/dqword wrapper layer for literal checks.
   if (node.kind == nnkCall or node.kind == nnkCommand) and node.len == 2 and
       getMn(node[0]) in ["byte", "word", "dword", "qword", "dqword",
-        "oword", "xmmword"]:
+        "oword", "xmmword", "ymmword", "yword"]:
     node[1]
   else:
     node
@@ -1132,26 +1239,30 @@ proc validateSseCommon(mn: string, args: seq[NimNode],
     rejectBadLiteral(mn, a)
     checkArchNode(a, aliases, curIsX64, stmt)
 
-proc rejectXmmInMem(mn: string, node: NimNode,
+proc isVecCls(cls: string): bool =
+  ## XMM or YMM register class (VEX vector file).
+  cls == "rcXmm" or cls == "rcYmm"
+
+proc rejectVecInMem(mn: string, node: NimNode,
     aliases: Table[string, string]) =
-  ## An xmm base/index would misassemble (the encoder reads the GPR
+  ## A vector base/index would misassemble (the encoder reads the GPR
   ## file); reject it at compile time. RIP-relative label operands
   ## contain no registers and pass through.
   case node.kind
   of nnkIdent:
     if isRegName(node.strVal, aliases) and
-        resolveRegName(node.strVal, aliases).cls == "rcXmm":
+        isVecCls(resolveRegName(node.strVal, aliases).cls):
       error("dynasm: '" & mn & "' memory operands address with " &
-        "general-purpose registers, not XMM", node)
+        "general-purpose registers, not vector registers", node)
   of nnkCall, nnkCommand:
-    if node.len >= 1 and getMn(node[0]) == "rx":
+    if node.len >= 1 and getMn(node[0]) in ["rx", "ry"]:
       error("dynasm: '" & mn & "' memory operands address with " &
-        "general-purpose registers, not XMM", node)
+        "general-purpose registers, not vector registers", node)
     for i in 1..<node.len:
-      rejectXmmInMem(mn, node[i], aliases)
+      rejectVecInMem(mn, node[i], aliases)
   else:
     for child in node:
-      rejectXmmInMem(mn, child, aliases)
+      rejectVecInMem(mn, child, aliases)
 
 proc isXmmOperand(o: OpStatic): bool =
   o.kind == oskReg and o.cls == "rcXmm"
@@ -1185,7 +1296,7 @@ proc validateSseMemReg(mn: string, memArg: NimNode,
       "' memory operand must look like [rbx + 8]; wrap a label in " &
       "[...] for RIP-relative addressing", memArg)
   checkSseMemSize(mn, m, memArg, needExplicitInt = false)
-  rejectXmmInMem(mn, memArg, aliases)
+  rejectVecInMem(mn, memArg, aliases)
 
 proc validateSseMemReg128(mn: string, memArg: NimNode,
     aliases: Table[string, string], stmt: NimNode) =
@@ -1195,7 +1306,7 @@ proc validateSseMemReg128(mn: string, memArg: NimNode,
       "' memory operand must look like [rbx + 8]; wrap a label in " &
       "[...] for RIP-relative addressing", memArg)
   checkSseMemSize(mn, m, memArg, needExplicitInt = false, is128 = true)
-  rejectXmmInMem(mn, memArg, aliases)
+  rejectVecInMem(mn, memArg, aliases)
 
 proc validateMovsd(args: seq[NimNode], aliases: Table[string, string],
     stmt: NimNode) =
@@ -1295,6 +1406,362 @@ proc validateXorpd(args: seq[NimNode], aliases: Table[string, string],
     stmt: NimNode) =
   validateLogicPd("xorpd", args, aliases, stmt)
 
+# --------------------------------------------------------------------------
+# AES-NI validation. Shapes mirror validateAluPd (xmm dst, xmm-or-m128
+# src) with AES-specific diagnostics; movdqa/movdqu reuse the packed
+# move rules (mem-to-mem forbidden, m128 sizing).
+# --------------------------------------------------------------------------
+
+proc validateAes(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind != oskReg and d.kind != oskOther:
+    error("dynasm: '" & mn & "' destination must be an XMM register",
+      args[0])
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: '" & mn &
+      "' destination must be an XMM register like xmm0", args[0])
+  if s.kind == oskMem:
+    validateSseMemReg128(mn, args[1], aliases, stmt)
+  elif s.kind == oskReg:
+    if not isXmmOperand(s):
+      error("dynasm: '" & mn &
+        "' source must be an XMM register or m128 memory", args[1])
+  elif s.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' source must be an XMM register or m128 memory", args[1])
+
+proc validateAesKeyGen(args: seq[NimNode], aliases: Table[string, string],
+    stmt: NimNode) =
+  validateAes("aeskeygenassist", @[args[0], args[1]], aliases, stmt)
+  let im = classifyOperand(args[2], aliases)
+  if im.kind == oskImm and im.isLit:
+    if im.lit < 0 or im.lit > 255:
+      error("dynasm: 'aeskeygenassist' immediate " & $im.lit &
+        " does not fit in a byte (0-255)", args[2])
+  elif im.kind == oskImm:
+    discard # sized immOp byte(...) without literal: runtime range check
+  elif im.kind == oskOther:
+    discard # arbitrary Nim expr: encoded truncated to imm8 at runtime
+  else:
+    error("dynasm: 'aeskeygenassist' third operand must be an 8-bit " &
+      "immediate like 0x01", args[2])
+
+proc validatePxor(args: seq[NimNode], aliases: Table[string, string],
+    stmt: NimNode) =
+  validateLogicPd("pxor", args, aliases, stmt)
+
+proc validateMovDqaDqu(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  validateMovPd(mn, args, aliases, stmt)
+
+# --------------------------------------------------------------------------
+# GHASH SSE validation. Two-operand forms mirror validateAluPd (xmm dst,
+# xmm-or-m128 src); pshufd/pclmulqdq add an imm8; group shifts take an
+# xmm dst plus imm8 (no memory form exists for the 0F 7x group).
+# --------------------------------------------------------------------------
+
+proc validateGhash2op(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind == oskMem and s.kind == oskMem:
+    error("dynasm: '" & mn & "' cannot move memory to memory", stmt)
+  if d.kind == oskMem:
+    # Store form exists only for por (movdqa/movdqu have their own
+    # validator); pshufb/punpcklqdq always write an XMM register.
+    if mn != "por":
+      error("dynasm: '" & mn &
+        "' destination must be an XMM register, not memory", args[0])
+    validateSseMemReg128(mn, args[0], aliases, stmt)
+    if s.kind == oskReg and not isXmmOperand(s):
+      error("dynasm: '" & mn &
+        "' source must be an XMM register for a memory destination",
+        args[1])
+    elif s.kind != oskReg and s.kind != oskOther:
+      error("dynasm: '" & mn &
+        "' source must be an XMM register for a memory destination",
+        args[1])
+    return
+  if d.kind != oskReg and d.kind != oskOther:
+    error("dynasm: '" & mn & "' destination must be an XMM register",
+      args[0])
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: '" & mn &
+      "' destination must be an XMM register like xmm0", args[0])
+  if s.kind == oskMem:
+    validateSseMemReg128(mn, args[1], aliases, stmt)
+  elif s.kind == oskReg:
+    if not isXmmOperand(s):
+      error("dynasm: '" & mn &
+        "' source must be an XMM register or m128 memory", args[1])
+  elif s.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' source must be an XMM register or m128 memory", args[1])
+
+proc validateGhashImm(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  validateGhash2op(mn, @[args[0], args[1]], aliases, stmt)
+  let im = classifyOperand(args[2], aliases)
+  if im.kind == oskImm and im.isLit:
+    if im.lit < 0 or im.lit > 255:
+      error("dynasm: '" & mn & "' immediate " & $im.lit &
+        " does not fit in a byte (0-255)", args[2])
+  elif im.kind == oskImm:
+    discard # sized immOp byte(...) without literal: runtime range check
+  elif im.kind == oskOther:
+    discard # arbitrary Nim expr: encoded truncated to imm8 at runtime
+  else:
+    error("dynasm: '" & mn & "' third operand must be an 8-bit " &
+      "immediate like 0x00", args[2])
+
+proc validateShiftQ(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  if d.kind == oskReg and not isXmmOperand(d):
+    error("dynasm: '" & mn &
+      "' destination must be an XMM register like xmm0", args[0])
+  elif d.kind != oskReg and d.kind != oskOther:
+    error("dynasm: '" & mn & "' needs an XMM register destination",
+      args[0])
+  let im = classifyOperand(args[1], aliases)
+  if im.kind == oskImm and im.isLit:
+    if im.lit < 0 or im.lit > 255:
+      error("dynasm: '" & mn & "' immediate " & $im.lit &
+        " does not fit in a byte (0-255)", args[1])
+  elif im.kind == oskImm:
+    discard
+  elif im.kind == oskOther:
+    discard
+  else:
+    error("dynasm: '" & mn & "' count must be an 8-bit immediate",
+      args[1])
+
+# --------------------------------------------------------------------------
+# VEX validation (P2). All vector operands in one instruction must share
+# a class (xmm = 128-bit, ymm = 256-bit); memory width must match, or be
+# bare. High-byte regs are unencodable anywhere under VEX (a prefix is
+# always emitted), unlike legacy forms that can omit REX.
+# --------------------------------------------------------------------------
+
+proc validateVexCommon(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], curIsX64: bool, stmt: NimNode) =
+  for a in args:
+    rejectBadLiteral(mn, a)
+    checkArchNode(a, aliases, curIsX64, stmt)
+
+proc rejectHigh8InMem(mn: string, node: NimNode,
+    aliases: Table[string, string]) =
+  case node.kind
+  of nnkIdent:
+    if isRegName(node.strVal, aliases) and
+        resolveRegName(node.strVal, aliases).cls == "rcHigh8":
+      error("dynasm: '" & mn &
+        "' cannot address memory with AH/CH/DH/BH under VEX " &
+        "(any VEX prefix forbids high-byte registers)", node)
+  of nnkCall, nnkCommand:
+    for i in 1..<node.len:
+      rejectHigh8InMem(mn, node[i], aliases)
+  else:
+    for child in node:
+      rejectHigh8InMem(mn, child, aliases)
+
+proc vexMemWidth(mn: string, o: OpStatic, arg: NimNode, is256: bool) =
+  if is256:
+    if o.size != "" and o.size != "szNone" and o.size != "sz256":
+      error("dynasm: '" & mn &
+        "' memory must be 32 bytes: use a bare [reg..] or ymmword [reg..]",
+        arg)
+  else:
+    if o.size != "" and o.size != "szNone" and o.size != "sz128":
+      error("dynasm: '" & mn &
+        "' memory must be 16 bytes: use a bare [reg..] or dqword [reg..]",
+        arg)
+
+proc validateVexMemAnyWidth(mn: string, memArg: NimNode,
+    aliases: Table[string, string], stmt: NimNode) =
+  ## Lenient width check for dynamic (non-static) register operands:
+  ## the runtime side derives L from the actual register.
+  let m = classifyOperand(memArg, aliases)
+  if m.kind != oskMem and m.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' memory operand must look like [rbx + 8]; wrap a label in " &
+      "[...] for RIP-relative addressing", memArg)
+  if m.kind == oskMem and m.size != "" and m.size != "szNone" and
+      m.size != "sz128" and m.size != "sz256":
+    error("dynasm: '" & mn &
+      "' memory must be 16 or 32 bytes: use a bare [reg..], " &
+      "dqword [reg..] or ymmword [reg..]", memArg)
+  rejectVecInMem(mn, memArg, aliases)
+  rejectHigh8InMem(mn, memArg, aliases)
+
+proc validateVexMem(mn: string, memArg: NimNode, is256: bool,
+    aliases: Table[string, string], stmt: NimNode) =
+  let m = classifyOperand(memArg, aliases)
+  if m.kind != oskMem and m.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' memory operand must look like [rbx + 8]; wrap a label in " &
+      "[...] for RIP-relative addressing", memArg)
+  if m.kind == oskMem:
+    vexMemWidth(mn, m, memArg, is256)
+  rejectVecInMem(mn, memArg, aliases)
+  rejectHigh8InMem(mn, memArg, aliases)
+
+proc vexClassAgree(mn: string, ops: seq[OpStatic],
+    args: seq[NimNode], stmt: NimNode): string =
+  ## Shared width of the static vector regs; "" when none is static
+  ## (dynamic operands defer to the runtime dispatch check).
+  result = ""
+  for i, o in ops:
+    if o.kind == oskReg and isVecCls(o.cls):
+      if result == "":
+        result = o.cls
+      elif o.cls != result:
+        error("dynasm: '" & mn &
+          "' cannot mix XMM (128-bit) and YMM (256-bit) registers",
+          args[i])
+
+proc validateVexArith(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s1 = classifyOperand(args[1], aliases)
+  let s2 = classifyOperand(args[2], aliases)
+  if d.kind == oskMem or s1.kind == oskMem:
+    error("dynasm: '" & mn &
+      "' only takes a memory operand in last position", stmt)
+  for i, o in [d, s1, s2]:
+    if o.kind == oskImm or o.kind == oskLabel:
+      error("dynasm: '" & mn &
+        "' needs vector register (or memory) operands, not " &
+        "immediates/labels", args[i])
+    if o.kind == oskReg and not isVecCls(o.cls):
+      error("dynasm: '" & mn &
+        "' needs XMM/YMM registers like xmm0 or ymm0", args[i])
+  let cls = vexClassAgree(mn, @[d, s1, s2], args, stmt)
+  if s2.kind == oskMem and cls != "":
+    validateVexMem(mn, args[2], cls == "rcYmm", aliases, stmt)
+  elif s2.kind == oskMem:
+    validateVexMemAnyWidth(mn, args[2], aliases, stmt)
+
+proc validateVexShufd(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind != oskReg and d.kind != oskOther:
+    error("dynasm: '" & mn & "' destination must be a vector register",
+      args[0])
+  if d.kind == oskReg and not isVecCls(d.cls):
+    error("dynasm: '" & mn &
+      "' destination must be an XMM/YMM register", args[0])
+  if s.kind == oskMem:
+    let cls = if d.kind == oskReg and isVecCls(d.cls): d.cls else: ""
+    if cls != "":
+      validateVexMem(mn, args[1], cls == "rcYmm", aliases, stmt)
+    else:
+      validateVexMemAnyWidth(mn, args[1], aliases, stmt)
+  elif s.kind == oskReg:
+    if not isVecCls(s.cls):
+      error("dynasm: '" & mn &
+        "' source must be a vector register or memory", args[1])
+  elif s.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' source must be a vector register or memory", args[1])
+  discard vexClassAgree(mn, @[d, s], args, stmt)
+  let im = classifyOperand(args[2], aliases)
+  if im.kind == oskImm and im.isLit:
+    if im.lit < 0 or im.lit > 255:
+      error("dynasm: '" & mn & "' immediate " & $im.lit &
+        " does not fit in a byte (0-255)", args[2])
+  elif im.kind == oskImm or im.kind == oskOther:
+    discard
+  else:
+    error("dynasm: '" & mn & "' third operand must be an 8-bit " &
+      "immediate like 0x0E", args[2])
+
+proc validateVexShift(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  # VEX shifts take no memory operands (unlike most VEX); the ModRM
+  # register field holds the count digit, so dst travels in VEX.vvvv.
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  for i, o in [d, s]:
+    if o.kind != oskReg and o.kind != oskOther:
+      error("dynasm: '" & mn & "' needs XMM/YMM register operands",
+        args[i])
+    if o.kind == oskReg and not isVecCls(o.cls):
+      error("dynasm: '" & mn &
+        "' needs XMM/YMM registers like xmm0 or ymm0", args[i])
+  discard vexClassAgree(mn, @[d, s], args, stmt)
+  let im = classifyOperand(args[2], aliases)
+  if im.kind == oskImm and im.isLit:
+    if im.lit < 0 or im.lit > 255:
+      error("dynasm: '" & mn & "' immediate " & $im.lit &
+        " does not fit in a byte (0-255)", args[2])
+  elif im.kind == oskImm or im.kind == oskOther:
+    discard
+  else:
+    error("dynasm: '" & mn & "' count must be an 8-bit immediate",
+      args[2])
+
+proc validateVmovdqu(mn: string, args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  let d = classifyOperand(args[0], aliases)
+  let s = classifyOperand(args[1], aliases)
+  if d.kind == oskMem and s.kind == oskMem:
+    error("dynasm: '" & mn & "' cannot move memory to memory", stmt)
+  if d.kind == oskReg and not isVecCls(d.cls):
+    error("dynasm: '" & mn & "' needs XMM/YMM registers", args[0])
+  elif d.kind != oskReg and d.kind != oskMem and d.kind != oskOther:
+    error("dynasm: '" & mn &
+      "' destination must be a register or memory", args[0])
+  if s.kind == oskReg and not isVecCls(s.cls):
+    error("dynasm: '" & mn & "' needs XMM/YMM registers", args[1])
+  elif s.kind != oskReg and s.kind != oskMem and s.kind != oskOther:
+    error("dynasm: '" & mn & "' needs a register or memory source",
+      args[1])
+  let cls = vexClassAgree(mn, @[d, s], args, stmt)
+  if d.kind == oskMem or s.kind == oskMem:
+    let memIdx = if d.kind == oskMem: 0 else: 1
+    if cls != "":
+      validateVexMem(mn, args[memIdx], cls == "rcYmm", aliases, stmt)
+    else:
+      # Unknown width (dynamic regs): accept bare or either marking;
+      # the runtime side derives L from the register operand.
+      validateVexMemAnyWidth(mn, args[memIdx], aliases, stmt)
+
+proc validateMulx(args: seq[NimNode],
+    aliases: Table[string, string], stmt: NimNode) =
+  for i in 0 ..< 2:
+    let o = classifyOperand(args[i], aliases)
+    if o.kind != oskReg and o.kind != oskOther:
+      error("dynasm: 'mulx' destination must be a general-purpose " &
+        "register", args[i])
+    if o.kind == oskReg and o.cls != "rcGpr":
+      error("dynasm: 'mulx' needs general-purpose registers " &
+        "(it is an integer multiply, not a vector op)", args[i])
+  let s = classifyOperand(args[2], aliases)
+  if s.kind != oskReg and s.kind != oskMem and s.kind != oskOther:
+    error("dynasm: 'mulx' source must be a register or memory", args[2])
+  if s.kind == oskReg and s.cls != "rcGpr":
+    error("dynasm: 'mulx' needs general-purpose registers", args[2])
+  # Width: every static size must be 32 or 64 bit, and all must agree.
+  var width = ""
+  for i, o in [classifyOperand(args[0], aliases),
+      classifyOperand(args[1], aliases), s]:
+    if o.kind == oskReg and o.size != "" and o.size != "szNone":
+      if o.size != "sz32" and o.size != "sz64":
+        error("dynasm: 'mulx' needs 32/64-bit registers like eax " &
+          "or rax", args[i])
+      if width == "":
+        width = o.size
+      elif o.size != width:
+        error("dynasm: 'mulx' operand size mismatch", stmt)
+  if s.kind == oskMem and s.size != "" and s.size != "szNone" and
+      s.size != "sz32" and s.size != "sz64":
+    error("dynasm: 'mulx' memory must be dword/qword sized, e.g. " &
+      "mulx edx, eax, dword [rbx]", args[2])
+
 proc validateCvtsi2sd(args: seq[NimNode], aliases: Table[string, string],
     stmt: NimNode) =
   let d = classifyOperand(args[0], aliases)
@@ -1306,7 +1773,7 @@ proc validateCvtsi2sd(args: seq[NimNode], aliases: Table[string, string],
     error("dynasm: 'cvtsi2sd' destination must be an XMM register",
       args[0])
   if s.kind == oskReg:
-    if s.cls == "rcXmm":
+    if isVecCls(s.cls):
       error("dynasm: 'cvtsi2sd' source must be a 32/64-bit " &
         "general-purpose register or memory", args[1])
     if s.size != "" and s.size != "szNone" and s.size != "sz32" and
@@ -1315,7 +1782,7 @@ proc validateCvtsi2sd(args: seq[NimNode], aliases: Table[string, string],
         "cvtsi2sd xmm0, eax or cvtsi2sd xmm0, rax", args[1])
   elif s.kind == oskMem:
     checkSseMemSize("cvtsi2sd", s, args[1], needExplicitInt = true)
-    rejectXmmInMem("cvtsi2sd", args[1], aliases)
+    rejectVecInMem("cvtsi2sd", args[1], aliases)
   elif s.kind != oskOther:
     error("dynasm: 'cvtsi2sd' source must be a 32/64-bit register " &
       "or dword/qword memory", args[1])
@@ -1325,7 +1792,7 @@ proc validateCvttsd2si(args: seq[NimNode], aliases: Table[string, string],
   let d = classifyOperand(args[0], aliases)
   let s = classifyOperand(args[1], aliases)
   if d.kind == oskReg:
-    if d.cls == "rcXmm":
+    if isVecCls(d.cls):
       error("dynasm: 'cvttsd2si' destination must be a 32/64-bit " &
         "general-purpose register", args[0])
     if d.size != "" and d.size != "szNone" and d.size != "sz32" and
@@ -1655,14 +2122,20 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         error("dynasm: '" & mn & "' needs at least one value", stmt)
       let o = copyNimTree(ops)
       for a in args:
-        # string or seq[byte]/openArray
-        result.add(quote do:
-          block:
-            let dynasmTmp = `a`
-            when dynasmTmp is string:
-              dynasmBytesStr(`o`, dynasmTmp)
-            else:
-              dynasmBytes(`o`, dynasmTmp))
+        if a.kind in intLitKinds and mn == "db":
+          # `db 0x90, 0x90`: raw byte list (the later `db` instruction
+          # branch is shadowed by this data directive, so int lists are
+          # handled here; seq[byte]/string still go through dynasmBytes).
+          result.add(quote do: `o`.push(cast[uint8](`a`)))
+        else:
+          # string or seq[byte]/openArray
+          result.add(quote do:
+            block:
+              let dynasmTmp = `a`
+              when dynasmTmp is string:
+                dynasmBytesStr(`o`, dynasmTmp)
+              else:
+                dynasmBytes(`o`, dynasmTmp))
       continue
     elif mn in ["rel8", "rel16", "rel32", "rel64"]:
       if args.len != 1:
@@ -1753,7 +2226,15 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         if mn in dynasmInstrWords or mn in aluMnemonics or
             mn in shiftMnemonics or mn in divMnemonics or
             mn in jccMnemonics or mn in setccMnemonics or
-            mn in cmovccMnemonics or mn in sseMnemonics:
+            mn in cmovccMnemonics or mn in sseMnemonics or
+            mn in aesMnemonics or mn == aesKeyGenMnemonic or
+            mn in aesIntMnemonics or mn in ghashVecMnemonics or
+            mn in ghashImmMnemonics or mn in ghashShiftMnemonics or
+            mn in chachaVecMnemonics or mn in chachaShiftMnemonics or
+            mn in vexArithMnemonics or mn == vexShufdMnemonic or
+            mn in vexShiftMnemonics or mn == vexMovMnemonic or
+            mn == vexZeroMnemonic or mn == mulxMnemonic or
+            mn == vexShufbMnemonic or mn in detectorMnemonics:
           error("dynasm: '" & mn &
             "' is an x86 instruction; use arch x64/x86 for it", stmt)
         error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
@@ -2071,6 +2552,218 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
       let d = opAst(0)
       let s = opAst(1)
       result.add(quote do: dynasmXorpd(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in aesMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: dst, src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateAes(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let mnLit = newLit(mn)
+      result.add(quote do: dynasmAes(`o`, `mnLit`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn == aesKeyGenMnemonic:
+      if args.len != 3:
+        error("aeskeygenassist needs 3 args: dst, src, imm8", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateAesKeyGen(args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let immNode = args[2]
+      result.add(quote do:
+        block:
+          let dynasmDst = `d`
+          let dynasmSrc = `s`
+          let dynasmImm = cast[int64](`immNode`)
+          dynasmAesKeyGen(`o`, dynasmDst, dynasmSrc, dynasmImm,
+            `isX64Lit`))
+      continue
+    elif mn in ["pxor"]:
+      if args.len != 2:
+        error("pxor needs 2 args: dst, src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validatePxor(args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmPxor(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ["movdqa", "movdqu"]:
+      if args.len != 2:
+        error(mn & " needs 2 args", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateMovDqaDqu(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      if mn == "movdqa":
+        result.add(quote do: dynasmMovdqa(`o`, `d`, `s`, `isX64Lit`))
+      else:
+        result.add(quote do: dynasmMovdqu(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ghashVecMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: dst, src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateGhash2op(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      if mn == "pshufb":
+        result.add(quote do: dynasmPshufb(`o`, `d`, `s`, `isX64Lit`))
+      elif mn == "punpcklqdq":
+        result.add(quote do: dynasmPunpcklqdq(`o`, `d`, `s`, `isX64Lit`))
+      else:
+        result.add(quote do: dynasmPor(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in ghashImmMnemonics:
+      if args.len != 3:
+        error(mn & " needs 3 args: dst, src, imm8", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateGhashImm(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let immNode = args[2]
+      if mn == "pclmulqdq":
+        result.add(quote do:
+          block:
+            let dynasmDst = `d`
+            let dynasmSrc = `s`
+            let dynasmImm = cast[int64](`immNode`)
+            dynasmPclmul(`o`, dynasmDst, dynasmSrc, dynasmImm,
+              `isX64Lit`))
+      else:
+        result.add(quote do:
+          block:
+            let dynasmDst = `d`
+            let dynasmSrc = `s`
+            let dynasmImm = cast[int64](`immNode`)
+            dynasmPshufd(`o`, dynasmDst, dynasmSrc, dynasmImm,
+              `isX64Lit`))
+      continue
+    elif mn in ghashShiftMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: xmm dst, imm8 count", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateShiftQ(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let immNode = args[1]
+      let mnLit = newLit(mn)
+      result.add(quote do:
+        block:
+          let dynasmDst = `d`
+          let dynasmImm = cast[int64](`immNode`)
+          dynasmShiftQ(`o`, `mnLit`, dynasmDst, dynasmImm))
+      continue
+    elif mn in chachaVecMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: dst, src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateGhash2op(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmPadd(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn in chachaShiftMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: xmm dst, imm8 count", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateShiftQ(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let immNode = args[1]
+      let mnLit = newLit(mn)
+      result.add(quote do:
+        block:
+          let dynasmDst = `d`
+          let dynasmImm = cast[int64](`immNode`)
+          dynasmShiftQ(`o`, `mnLit`, dynasmDst, dynasmImm))
+      continue
+    elif mn in vexArithMnemonics:
+      if args.len != 3:
+        error(mn & " needs 3 args: dst, src1, src2", stmt)
+      validateVexCommon(mn, args, aliases, curIsX64, stmt)
+      validateVexArith(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s1 = opAst(1)
+      let s2 = opAst(2)
+      let mnLit = newLit(mn)
+      result.add(quote do: dynasmVexArith(`o`, `mnLit`, `d`, `s1`, `s2`,
+        `isX64Lit`))
+      continue
+    elif mn == vexShufdMnemonic:
+      if args.len != 3:
+        error("vpshufd needs 3 args: dst, src, imm8", stmt)
+      validateVexCommon(mn, args, aliases, curIsX64, stmt)
+      validateVexShufd(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let immNode = args[2]
+      result.add(quote do:
+        block:
+          let dynasmDst = `d`
+          let dynasmSrc = `s`
+          let dynasmImm = cast[int64](`immNode`)
+          dynasmVexShufd(`o`, dynasmDst, dynasmSrc, dynasmImm,
+            `isX64Lit`))
+      continue
+    elif mn in vexShiftMnemonics:
+      if args.len != 3:
+        error(mn & " needs 3 args: dst, src, imm8 (no mem form)", stmt)
+      validateVexCommon(mn, args, aliases, curIsX64, stmt)
+      validateVexShift(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      let immNode = args[2]
+      let mnLit = newLit(mn)
+      result.add(quote do:
+        block:
+          let dynasmDst = `d`
+          let dynasmSrc = `s`
+          let dynasmImm = cast[int64](`immNode`)
+          dynasmVexShift(`o`, `mnLit`, dynasmDst, dynasmSrc, dynasmImm))
+      continue
+    elif mn == vexMovMnemonic:
+      if args.len != 2:
+        error("vmovdqu needs 2 args", stmt)
+      validateVexCommon(mn, args, aliases, curIsX64, stmt)
+      validateVmovdqu(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      result.add(quote do: dynasmVmovdqu(`o`, `d`, `s`, `isX64Lit`))
+      continue
+    elif mn == vexZeroMnemonic:
+      if args.len != 0:
+        error("dynasm: 'vzeroupper' takes no operands", stmt)
+      let oo = copyNimTree(ops)
+      result.add(quote do: dynasmVzeroupper(`oo`))
+      continue
+    elif mn == vexShufbMnemonic:
+      if args.len != 3:
+        error("vpshufb needs 3 args: dst, src1, src2", stmt)
+      validateVexCommon(mn, args, aliases, curIsX64, stmt)
+      validateVexArith(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s1 = opAst(1)
+      let s2 = opAst(2)
+      result.add(quote do: dynasmVexShufb(`o`, `d`, `s1`, `s2`,
+        `isX64Lit`))
+      continue
+    elif mn in detectorMnemonics:
+      if args.len != 0:
+        error("dynasm: '" & mn & "' takes no operands", stmt)
+      let oo = copyNimTree(ops)
+      if mn == "cpuid":
+        result.add(quote do: dynasmCpuid(`oo`))
+      else:
+        result.add(quote do: dynasmXgetbv(`oo`))
+      continue
+    elif mn == mulxMnemonic:
+      if args.len != 3:
+        error("mulx needs 3 args: hi dst, lo dst, src", stmt)
+      validateCommon(mn, args, aliases, curIsX64, stmt)
+      validateMulx(args, aliases, stmt)
+      let hd = opAst(0)
+      let ld = opAst(1)
+      let s = opAst(2)
+      result.add(quote do: dynasmMulx(`o`, `hd`, `ld`, `s`, `isX64Lit`))
       continue
     elif mn in ["call"]:
       if args.len != 1:

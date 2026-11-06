@@ -11,6 +11,7 @@ type
     rcFpu       ## ST0..7
     rcMmx
     rcXmm
+    rcYmm       ## 256-bit AVX vectors (VEX-encoded only)
     rcSeg
     rcControl
     rcDebug
@@ -25,6 +26,7 @@ proc regCode*(r: Register): uint8 = r.code
 proc Rq*(idx: int): Register = Register(code: uint8(idx and 0xF), cls: rcGpr)
 proc Rd*(idx: int): Register = Register(code: uint8(idx and 0xF), cls: rcGpr)
 proc Rx*(idx: int): Register = Register(code: uint8(idx and 0xF), cls: rcXmm)
+proc Ry*(idx: int): Register = Register(code: uint8(idx and 0xF), cls: rcYmm)
 
 # AArch64 dynamic registers (mirrors dynasm-rs dynamic RegKind):
 # Xreg(n) is 64-bit, Wreg(n) is 32-bit, n masked to 5 bits.
@@ -196,6 +198,24 @@ const
   xmm14* = Register(code: 14, cls: rcXmm)
   xmm15* = Register(code: 15, cls: rcXmm)
 
+  # YMM (256-bit AVX; VEX-encoded only, L=1)
+  ymm0* = Register(code: 0, cls: rcYmm)
+  ymm1* = Register(code: 1, cls: rcYmm)
+  ymm2* = Register(code: 2, cls: rcYmm)
+  ymm3* = Register(code: 3, cls: rcYmm)
+  ymm4* = Register(code: 4, cls: rcYmm)
+  ymm5* = Register(code: 5, cls: rcYmm)
+  ymm6* = Register(code: 6, cls: rcYmm)
+  ymm7* = Register(code: 7, cls: rcYmm)
+  ymm8* = Register(code: 8, cls: rcYmm)
+  ymm9* = Register(code: 9, cls: rcYmm)
+  ymm10* = Register(code: 10, cls: rcYmm)
+  ymm11* = Register(code: 11, cls: rcYmm)
+  ymm12* = Register(code: 12, cls: rcYmm)
+  ymm13* = Register(code: 13, cls: rcYmm)
+  ymm14* = Register(code: 14, cls: rcYmm)
+  ymm15* = Register(code: 15, cls: rcYmm)
+
 # --------------------------------------------------------------------------
 # Operand model used by encoder + macro
 # --------------------------------------------------------------------------
@@ -208,6 +228,7 @@ type
     sz32
     sz64
     sz128
+    sz256     ## 256-bit AVX memory operands (ymmword/yword)
 
   LabelRefKind* = enum
     lrForward
@@ -325,6 +346,8 @@ proc qword*(m: MemOp): Operand = memOp(m, sz64)
 proc dqword*(m: MemOp): Operand = memOp(m, sz128)
 proc oword*(m: MemOp): Operand = memOp(m, sz128)
 proc xmmword*(m: MemOp): Operand = memOp(m, sz128)
+proc ymmword*(m: MemOp): Operand = memOp(m, sz256)
+proc yword*(m: MemOp): Operand = memOp(m, sz256)
 
 proc dqword*(r: Register): Operand = regOp(r, sz128)
 proc oword*(r: Register): Operand = regOp(r, sz128)
