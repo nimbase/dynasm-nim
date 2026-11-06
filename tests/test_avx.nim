@@ -324,7 +324,9 @@ when defined(amd64):
     ## XCR0[2:1] via xgetbv (the OS must save/restore YMM state).
     ## Each bit is parked in its own register across the three
     ## queries: a second cpuid destroys EAX and xgetbv needs ECX=0,
-    ## so nothing is allowed to live in AL/CL across them.
+    ## so nothing is allowed to live in AL/CL across them. Park in
+    ## r10d/r11d: caller-saved (volatile) on both SysV and Windows
+    ## (esi/edi are callee-saved on Windows and must not be clobbered).
     var a = newAssembler(akX64)
     dynasm a:
       arch x64
@@ -335,22 +337,22 @@ when defined(amd64):
       mov edx, 32 # 1 shl 5
       test ebx, edx
       setnz al # avx2 bit
-      movzx esi, al # park in esi (caller-saved)
+      movzx r10d, al # park in r10d (volatile on both ABIs)
       mov eax, 1
       cpuid()
       mov edx, 0x08000000 # 1 shl 27
       test ecx, edx
       setnz cl # osxsave bit
-      movzx edi, cl # park in edi (caller-saved)
+      movzx r11d, cl # park in r11d (volatile on both ABIs)
       `xor` ecx, ecx
       xgetbv() # xcr0 -> edx:eax
       `and` eax, 6
       cmp eax, 6
       setz dl # xcr0 has SSE+AVX state
       movzx edx, dl # park in edx
-      `and` esi, edi
-      `and` esi, edx
-      mov eax, esi
+      `and` r10d, r11d
+      `and` r10d, edx
+      mov eax, r10d
       pop rbx
       ret()
     var buf = a.finalize()

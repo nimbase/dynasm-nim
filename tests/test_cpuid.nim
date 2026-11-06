@@ -62,11 +62,12 @@ when defined(amd64):
       arch x64
       alias outptr, rdi, rcx
       push rbx
+      # Stash outptr BEFORE cpuid: cpuid overwrites EAX/EBX/ECX/EDX,
+      # and on Windows outptr is RCX whose low half (ECX) is clobbered.
+      mov r11, outptr
       mov eax, l
       mov ecx, s
       cpuid()
-      mov r11, outptr # caller-saved stash (cpuid writes no GPRs but
-                      # be explicit: outptr lives across the query)
       mov [r11], eax
       mov [r11 + 4], ebx
       mov [r11 + 8], ecx
@@ -97,10 +98,10 @@ when defined(amd64):
       arch x64
       alias outptr, rdi, rcx
       push rbx
+      mov r11, outptr
       mov eax, l
       mov ecx, s
       db 0x0F, 0xA2
-      mov r11, outptr
       mov [r11], eax
       mov [r11 + 4], ebx
       mov [r11 + 8], ecx
