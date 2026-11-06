@@ -1350,6 +1350,22 @@ proc encVzeroupper*(a: var auto) =
   a.push(0xF8'u8)
   a.push(0x77'u8)
 
+# --------------------------------------------------------------------------
+# P3 detector instructions. Fixed byte sequences, no operands: cpuid
+# reads EAX/ECX and writes EAX/EBX/ECX/EDX; xgetbv reads ECX and writes
+# EDX:EAX. AVX2 dispatch needs OSXSAVE+XCR0 via xgetbv, not cpuid
+# alone, so both are first-class mnemonics rather than db blobs.
+# --------------------------------------------------------------------------
+
+proc encCpuid*(a: var auto) =
+  a.push(0x0F'u8)
+  a.push(0xA2'u8)
+
+proc encXgetbv*(a: var auto) =
+  a.push(0x0F'u8)
+  a.push(0x01'u8)
+  a.push(0xD0'u8)
+
 proc encMulxRegRegReg*(a: var auto, hi, lo, src: Register,
     is64: bool) =
   ## MULX: HI -> reg, LO -> vvvv, SRC -> r/m; pp=F2, map=0F38, W=size.

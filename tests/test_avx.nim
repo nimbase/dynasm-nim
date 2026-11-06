@@ -262,7 +262,7 @@ when defined(amd64):
       arch x64
       push rbx
       mov eax, 1
-      db 0x0F, 0xA2 # cpuid
+      cpuid()
       mov edx, 268435456 # 1 shl 28
       test ecx, edx
       setnz al
@@ -288,19 +288,19 @@ when defined(amd64):
       push rbx
       mov eax, 7
       `xor` ecx, ecx
-      db 0x0F, 0xA2 # cpuid
+      cpuid()
       mov edx, 32 # 1 shl 5
       test ebx, edx
       setnz al # avx2 bit
       movzx esi, al # park in esi (caller-saved)
       mov eax, 1
-      db 0x0F, 0xA2 # cpuid
+      cpuid()
       mov edx, 0x08000000 # 1 shl 27
       test ecx, edx
       setnz cl # osxsave bit
       movzx edi, cl # park in edi (caller-saved)
       `xor` ecx, ecx
-      db 0x0F, 0x01, 0xD0 # xgetbv, xcr0 -> edx:eax
+      xgetbv() # xcr0 -> edx:eax
       `and` eax, 6
       cmp eax, 6
       setz dl # xcr0 has SSE+AVX state
@@ -325,7 +325,7 @@ when defined(amd64):
       push rbx
       mov eax, 7
       `xor` ecx, ecx
-      db 0x0F, 0xA2 # cpuid
+      cpuid()
       mov edx, 256 # 1 shl 8
       test ebx, edx
       setnz al

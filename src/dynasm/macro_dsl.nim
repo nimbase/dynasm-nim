@@ -467,6 +467,10 @@ const vexMovMnemonic = "vmovdqu"
 const vexZeroMnemonic = "vzeroupper"
 const mulxMnemonic = "mulx"
 
+# P3 detector mnemonics. Zero-operand system instructions used by
+# runtime feature gates (cpuid leaf queries, xgetbv XCR0 check).
+const detectorMnemonics = ["cpuid", "xgetbv"]
+
 const dynasmDirectiveWords = ["arch", "alias", "label", "locallabel",
   "global", "globallabel", "dynamiclabel", "binddyn", "dynlabel", "align",
   "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64",
@@ -530,6 +534,8 @@ proc isDynasmWord(mn: string): bool =
   if mn in vexArithMnemonics or mn == vexShufdMnemonic or
       mn in vexShiftMnemonics or mn == vexMovMnemonic or
       mn == vexZeroMnemonic or mn == mulxMnemonic:
+    return true
+  if mn in detectorMnemonics:
     return true
   if mn in jccMnemonics:
     return true
@@ -645,6 +651,10 @@ proc suggestWord(mn: string): string =
     if d > 0 and d <= thresh:
       cands.add((d, w))
   for w in vexShiftMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in detectorMnemonics:
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
@@ -2221,7 +2231,8 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
             mn in chachaVecMnemonics or mn in chachaShiftMnemonics or
             mn in vexArithMnemonics or mn == vexShufdMnemonic or
             mn in vexShiftMnemonics or mn == vexMovMnemonic or
-            mn == vexZeroMnemonic or mn == mulxMnemonic:
+            mn == vexZeroMnemonic or mn == mulxMnemonic or
+            mn in detectorMnemonics:
           error("dynasm: '" & mn &
             "' is an x86 instruction; use arch x64/x86 for it", stmt)
         error("dynasm: unhandled mnemonic '" & mn & "'", stmt)
@@ -2721,6 +2732,15 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
         error("dynasm: 'vzeroupper' takes no operands", stmt)
       let oo = copyNimTree(ops)
       result.add(quote do: dynasmVzeroupper(`oo`))
+      continue
+    elif mn in detectorMnemonics:
+      if args.len != 0:
+        error("dynasm: '" & mn & "' takes no operands", stmt)
+      let oo = copyNimTree(ops)
+      if mn == "cpuid":
+        result.add(quote do: dynasmCpuid(`oo`))
+      else:
+        result.add(quote do: dynasmXgetbv(`oo`))
       continue
     elif mn == mulxMnemonic:
       if args.len != 3:

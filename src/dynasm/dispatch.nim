@@ -662,6 +662,12 @@ proc dynasmVmovdqu*(a: var auto, dst, src: Operand, isX64: bool) =
 proc dynasmVzeroupper*(a: var auto) =
   encVzeroupper(a)
 
+proc dynasmCpuid*(a: var auto) =
+  encCpuid(a)
+
+proc dynasmXgetbv*(a: var auto) =
+  encXgetbv(a)
+
 proc dynasmMulx*(a: var auto, hi, lo, src: Operand, isX64: bool) =
   if hi.kind != okReg or lo.kind != okReg:
     raise impossibleRelocation("mulx needs GPR dst regs")
