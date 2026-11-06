@@ -562,9 +562,12 @@ when defined(amd64):
     var x = a
     var y = b
     var o: array[16, uint8]
-    # NOTE: mulx writes rdx (hi), which is also the out-pointer on
-    # SysV; stash the out-pointer in r11 first (caller-saved, never
-    # an argument register).
+    # MULX hi, lo, src computes RDX * src -> hi:lo (RDX is the
+    # implicit first source; HI/LO are explicit dests). Stash the
+    # out-pointer in r11, load B before clobbering RDX with A, and
+    # use r8/r9 as HI/LO so RDX stays the input. For the mem form
+    # the B pointer itself must be saved first: on Windows bptr is
+    # RDX, which we overwrite with A.
     if useMem:
       dynasm asmObj:
         arch x64
@@ -572,10 +575,11 @@ when defined(amd64):
         alias bptr, rsi, rdx
         alias outptr, rdx, r8
         mov r11, outptr
-        mov rax, [aptr]
-        mulx rdx, rax, [bptr]
-        mov [r11], rdx
-        mov [r11 + 8], rax
+        mov r10, bptr
+        mov rdx, [aptr]
+        mulx r8, r9, [r10]
+        mov [r11], r8
+        mov [r11 + 8], r9
         ret()
     else:
       dynasm asmObj:
@@ -584,11 +588,11 @@ when defined(amd64):
         alias bptr, rsi, rdx
         alias outptr, rdx, r8
         mov r11, outptr
-        mov rax, [aptr]
         mov r10, [bptr]
-        mulx rdx, rax, r10
-        mov [r11], rdx
-        mov [r11 + 8], rax
+        mov rdx, [aptr]
+        mulx r8, r9, r10
+        mov [r11], r8
+        mov [r11 + 8], r9
         ret()
     var buf = asmObj.finalize()
     type Fn = proc(a, b, c: pointer) {.cdecl.}
@@ -602,17 +606,19 @@ when defined(amd64):
     var x = a
     var y = b
     var o: array[8, uint8]
+    # 32-bit MULX: EDX * src -> hi:lo. Same dance as the 64-bit
+    # form: stash outptr, load B first, then EDX = A.
     dynasm asmObj:
       arch x64
       alias aptr, rdi, rcx
       alias bptr, rsi, rdx
       alias outptr, rdx, r8
       mov r11, outptr
-      mov eax, [aptr]
       mov r10d, [bptr]
-      mulx edx, eax, r10d
-      mov [r11], edx
-      mov [r11 + 4], eax
+      mov edx, [aptr]
+      mulx r8d, r9d, r10d
+      mov [r11], r8d
+      mov [r11 + 4], r9d
       ret()
     var buf = asmObj.finalize()
     type Fn = proc(a, b, c: pointer) {.cdecl.}
@@ -758,28 +764,28 @@ when defined(amd64):
   var gMulxWorks = -1 # -1 unknown, 0 broken, 1 works. Set by
   # hostMulxWorks; see note below.
   proc hostMulxWorks(): bool =
-    ## Functional MULX self-test. The encoder is byte-identical to clang
-    ## for every MULX form (goldens above), but at least one host class
-    ## executes MULX with the wrong data flow even for clang-assembled
-    ## bytes: SRC (ModRM.rm) is ignored and RDX is read instead
-    ## (verified with pure clang asm + _mulx_u64 disassembly on an
-    ## AMD Ryzen 5500 macOS box reporting BMI2=1). Gate execution on
-    ## observed behavior, not just CPUID, so the suite stays green
-    ## there; the goldens still pin the encoding.
+    ## Functional MULX self-test. MULX hi, lo, src computes
+    ## RDX * src -> hi:lo (RDX is the implicit first source), so the
+    ## probe must put A in RDX, not in the LO dest. Gate execution on
+    ## observed behavior, not just CPUID, so the suite stays green on
+    ## hosts where BMI2 reports present but MULX faults or misbehaves;
+    ## the goldens still pin the encoding.
     if gMulxWorks >= 0:
       return gMulxWorks == 1
     var a = newAssembler(akX64)
     dynasm a:
       arch x64
-      mov rax, 2
+      mov rdx, 2
       mov r10, 3 # r10, not rbx: rbx is callee-saved
-      mulx rdx, rax, r10
-      ret() # lo in rax, hi in rdx (caller reads rax only)
+      mulx r8, r9, r10
+      mov rax, r9
+      ret() # lo in rax, hi in r8 (caller reads rax only)
     var buf = a.finalize()
     type Fn = proc(): uint64 {.cdecl.}
     let lo = cast[Fn](buf.ptrAt(AssemblyOffset(0)))()
     buf.destroy()
-    # lo must be 6; on the broken host it is lo_in*rdx_garbage.
+    # lo must be 6 (2*3); if BMI2 is advertised but MULX faults
+    # or misbehaves the probe fails and execution is skipped.
     let ok = lo == 6'u64
     gMulxWorks = if ok: 1 else: 0
     if not ok:
