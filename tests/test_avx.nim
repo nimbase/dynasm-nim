@@ -98,80 +98,6 @@ test "poly1305 sse encodings":
     0x66'u8, 0x0F'u8, 0xD4'u8, 0x00'u8,
     0x66'u8, 0x0F'u8, 0xDB'u8, 0x54'u8, 0xCB'u8, 0x10'u8]
 
-proc jitPolySse2(a, b: array[16, uint8], mn: string): array[16, uint8] =
-  ## Legacy-SSE2 helper (no host gate: SSE2 is baseline amd64).
-  var asmObj = newAssembler(akX64)
-  var x = a
-  var y = b
-  var o: array[16, uint8]
-  if mn == "pmuludq":
-    dynasm asmObj:
-      arch x64
-      alias aptr, rdi, rcx
-      alias bptr, rsi, rdx
-      alias outptr, rdx, r8
-      movdqu xmm0, [aptr]
-      movdqu xmm1, [bptr]
-      pmuludq xmm0, xmm1
-      movdqu [outptr], xmm0
-      ret()
-  elif mn == "paddq":
-    dynasm asmObj:
-      arch x64
-      alias aptr, rdi, rcx
-      alias bptr, rsi, rdx
-      alias outptr, rdx, r8
-      movdqu xmm0, [aptr]
-      movdqu xmm1, [bptr]
-      paddq xmm0, xmm1
-      movdqu [outptr], xmm0
-      ret()
-  else:
-    dynasm asmObj:
-      arch x64
-      alias aptr, rdi, rcx
-      alias bptr, rsi, rdx
-      alias outptr, rdx, r8
-      movdqu xmm0, [aptr]
-      movdqu xmm1, [bptr]
-      pand xmm0, xmm1
-      movdqu [outptr], xmm0
-      ret()
-  var buf = asmObj.finalize()
-  type Fn = proc(a, b, c: pointer) {.cdecl.}
-  cast[Fn](buf.ptrAt(AssemblyOffset(0)))(addr x, addr y, addr o)
-  result = o
-
-test "poly1305 sse executes":
-  var a: array[16, uint8]
-  var b: array[16, uint8]
-  for i in 0 ..< 16:
-    a[i] = cast[uint8](i * 17 + 3)
-    b[i] = cast[uint8](i * 29 + 7)
-  let m = jitPolySse2(a, b, "pmuludq")
-  for lane in [0, 8]:
-    var aw = 0'u64
-    var bw = 0'u64
-    for k in 0 ..< 4:
-      aw = aw or (uint64(a[lane + k]) shl (8 * k))
-      bw = bw or (uint64(b[lane + k]) shl (8 * k))
-    let pw = aw * bw
-    for k in 0 ..< 8:
-      check m[lane + k] == cast[uint8]((pw shr (8 * k)) and 0xFF'u64)
-  let q = jitPolySse2(a, b, "paddq")
-  for lane in [0, 8]:
-    var aw = 0'u64
-    var bw = 0'u64
-    for k in 0 ..< 8:
-      aw = aw or (uint64(a[lane + k]) shl (8 * k))
-      bw = bw or (uint64(b[lane + k]) shl (8 * k))
-    let sw = aw + bw
-    for k in 0 ..< 8:
-      check q[lane + k] == cast[uint8]((sw shr (8 * k)) and 0xFF'u64)
-  let n = jitPolySse2(a, b, "pand")
-  for i in 0 ..< 16:
-    check n[i] == (a[i] and b[i])
-
 test "vmovdqu and vzeroupper encodings":
   var v = initVecAssembler(0)
   dynasm v:
@@ -389,6 +315,82 @@ func unpackU64le(b: array[16, uint8]): tuple[hi, lo: uint64] =
   (hi, lo)
 
 when defined(amd64):
+  proc jitPolySse2(a, b: array[16, uint8], mn: string): array[16, uint8] =
+    ## Legacy-SSE2 execution helper. Lives inside the amd64 gate like
+    ## the other execution helpers: assembling is host-independent, but
+    ## calling x86 machine code SIGILLs on ARM runners.
+    var asmObj = newAssembler(akX64)
+    var x = a
+    var y = b
+    var o: array[16, uint8]
+    if mn == "pmuludq":
+      dynasm asmObj:
+        arch x64
+        alias aptr, rdi, rcx
+        alias bptr, rsi, rdx
+        alias outptr, rdx, r8
+        movdqu xmm0, [aptr]
+        movdqu xmm1, [bptr]
+        pmuludq xmm0, xmm1
+        movdqu [outptr], xmm0
+        ret()
+    elif mn == "paddq":
+      dynasm asmObj:
+        arch x64
+        alias aptr, rdi, rcx
+        alias bptr, rsi, rdx
+        alias outptr, rdx, r8
+        movdqu xmm0, [aptr]
+        movdqu xmm1, [bptr]
+        paddq xmm0, xmm1
+        movdqu [outptr], xmm0
+        ret()
+    else:
+      dynasm asmObj:
+        arch x64
+        alias aptr, rdi, rcx
+        alias bptr, rsi, rdx
+        alias outptr, rdx, r8
+        movdqu xmm0, [aptr]
+        movdqu xmm1, [bptr]
+        pand xmm0, xmm1
+        movdqu [outptr], xmm0
+        ret()
+    var buf = asmObj.finalize()
+    type Fn = proc(a, b, c: pointer) {.cdecl.}
+    cast[Fn](buf.ptrAt(AssemblyOffset(0)))(addr x, addr y, addr o)
+    result = o
+
+  test "poly1305 sse executes":
+    var a: array[16, uint8]
+    var b: array[16, uint8]
+    for i in 0 ..< 16:
+      a[i] = cast[uint8](i * 17 + 3)
+      b[i] = cast[uint8](i * 29 + 7)
+    let m = jitPolySse2(a, b, "pmuludq")
+    for lane in [0, 8]:
+      var aw = 0'u64
+      var bw = 0'u64
+      for k in 0 ..< 4:
+        aw = aw or (uint64(a[lane + k]) shl (8 * k))
+        bw = bw or (uint64(b[lane + k]) shl (8 * k))
+      let pw = aw * bw
+      for k in 0 ..< 8:
+        check m[lane + k] == cast[uint8]((pw shr (8 * k)) and 0xFF'u64)
+    let q = jitPolySse2(a, b, "paddq")
+    for lane in [0, 8]:
+      var aw = 0'u64
+      var bw = 0'u64
+      for k in 0 ..< 8:
+        aw = aw or (uint64(a[lane + k]) shl (8 * k))
+        bw = bw or (uint64(b[lane + k]) shl (8 * k))
+      let sw = aw + bw
+      for k in 0 ..< 8:
+        check q[lane + k] == cast[uint8]((sw shr (8 * k)) and 0xFF'u64)
+    let n = jitPolySse2(a, b, "pand")
+    for i in 0 ..< 16:
+      check n[i] == (a[i] and b[i])
+
   proc hostHasAvx(): bool =
     ## cpuid.01H:ECX[28].
     var a = newAssembler(akX64)
