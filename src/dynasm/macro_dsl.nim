@@ -409,7 +409,7 @@ proc operandAst(node: NimNode, aliases: Table[string, string]): NimNode =
 # --------------------------------------------------------------------------
 
 const aluMnemonics = ["add", "sub", "xor", "and", "or", "cmp"]
-const shiftMnemonics = ["shl", "sal", "shr", "sar"]
+const shiftMnemonics = ["shl", "sal", "shr", "sar", "rol", "ror"]
 const divMnemonics = ["mul", "div", "idiv", "neg", "not"]
 const jccMnemonics = ["jo", "jno", "jb", "jnae", "jc", "jnb", "jae", "jnc",
   "jz", "je", "jnz", "jne", "jbe", "jna", "ja", "jnbe", "js", "jns",
@@ -486,7 +486,7 @@ const dynasmInstrWords = ["mov", "movabs", "lea", "add", "sub", "xor",
   "and", "or", "cmp", "test", "inc", "dec", "push", "pop", "jmp",
   "jmp_short", "jmp8", "call", "ret", "retn", "nop", "int3", "leave",
   "hlt", "cqo", "cdq", "movzx", "imul", "mul", "div", "idiv", "neg",
-  "not", "shl", "sal", "shr", "sar", "lock", "rep", "repe", "repz",
+  "not", "shl", "sal", "shr", "sar", "rol", "ror", "lock", "rep", "repe", "repz",
   "repne", "repnz"]
 
 # AArch64 mnemonics for `arch aarch64` blocks (unified DSL: same

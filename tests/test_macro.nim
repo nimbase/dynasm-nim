@@ -161,3 +161,20 @@ test "dynasm macro backward jcc auto-shortens":
   let code = ops.finalize()
   # 7C FD, ret.
   check code == @[0x90'u8, 0x7C'u8, 0xFD'u8, 0xC3'u8]
+
+test "dynasm macro rol/ror shifts":
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch x64
+    rol rax, cl
+    ror rax, cl
+    rol r9d, 3
+    ror rbx, 1
+    ret()
+  let code = ops.finalize()
+  # REX.W D3 /0 cl; REX.W D3 /1 cl; REX.B C1 /0 ib; REX.W C1 /1 ib; ret.
+  check code == @[0x48'u8, 0xD3'u8, 0xC0'u8,
+    0x48'u8, 0xD3'u8, 0xC8'u8,
+    0x41'u8, 0xC1'u8, 0xC1'u8, 0x03'u8,
+    0x48'u8, 0xC1'u8, 0xCB'u8, 0x01'u8,
+    0xC3'u8]

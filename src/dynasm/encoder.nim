@@ -687,6 +687,8 @@ proc shiftDigit(mn: string): uint8 =
   of "shl", "sal": 4'u8
   of "shr": 5'u8
   of "sar": 7'u8
+  of "rol": 0'u8
+  of "ror": 1'u8
   else:
     raise impossibleRelocation("unknown shift " & mn)
 
