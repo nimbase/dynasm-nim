@@ -168,6 +168,16 @@ proc a64CSet*(a: var auto, base: uint32, rd: Register) =
   ## condition and sf baked into base by the matcher).
   emitWord(a, base or rcode(rd))
 
+proc a64Csel*(a: var auto, base: uint32, rd, rn, rm: Register,
+    cond: int64) =
+  ## csel/csinc: R(0), R(5), R(16) + 4-bit condition at 12. The cond
+  ## value comes from the matcher (no inversion, unlike cset); al/nv
+  ## are permitted (always/never select).
+  if cond < 0 or cond > 15:
+    raise badImm("csel/csinc condition out of range 0-15")
+  emitWord(a, base or rcode(rd) or (rcode(rn) shl 5) or
+    (rcode(rm) shl 16) or ((uint32(cond) and 0xF'u32) shl 12))
+
 # --------------------------------------------------------------------------
 # Data-processing immediates
 # --------------------------------------------------------------------------
@@ -367,6 +377,15 @@ proc a64Mem9*(a: var auto, base: uint32, rt, rn: Register, off: int64) =
   ## Pre/post-index ldr/str: Sbits(12,9), range -256..255.
   if off < -256 or off > 255:
     raise badImm("pre/post-index offset out of range -256..255")
+  emitWord(a, base or rcode(rt) or (rcode(rn) shl 5) or
+    ((uint32(off) and 0x1FF'u32) shl 12))
+
+proc a64MemU9*(a: var auto, base: uint32, rt, rn: Register, off: int64) =
+  ## ldur/stur: signed 9-bit unscaled offset at 12, range -256..255.
+  ## Same field as pre/post-index, but the base keeps bits 11-10 = 00
+  ## (no writeback), so it needs its own form.
+  if off < -256 or off > 255:
+    raise badImm("ldur/stur offset out of range -256..255")
   emitWord(a, base or rcode(rt) or (rcode(rn) shl 5) or
     ((uint32(off) and 0x1FF'u32) shl 12))
 

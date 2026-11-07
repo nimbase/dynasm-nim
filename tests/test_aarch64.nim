@@ -111,6 +111,38 @@ test "aarch64 loads/stores/pairs":
   check word(code, 24) == 0xF8627820'u32
   check word(code, 28) == 0xD65F03C0'u32
 
+test "aarch64 csel/csinc/ldur/stur":
+  # Golden vectors from clang --target=aarch64-linux-gnu disassembly.
+  var ops = initVecAssembler(0)
+  dynasm ops:
+    arch aarch64
+    csel x0, x1, x2, eq
+    csel w3, w4, w5, hi
+    csinc x6, x7, x8, ne
+    csinc w9, w10, w11, lt
+    csel x12, x13, x14, al
+    ldur x0, [x1, -8]
+    ldur w4, [x5]
+    ldur x6, [x7, 255]
+    stur x2, [x3, -256]
+    stur w8, [x9, 100]
+    stur x10, [x11]
+    ret()
+  let code = ops.finalize()
+  check code.len == 12 * 4
+  check word(code, 0) == 0x9A820020'u32
+  check word(code, 4) == 0x1A858083'u32
+  check word(code, 8) == 0x9A8814E6'u32
+  check word(code, 12) == 0x1A8BB549'u32
+  check word(code, 16) == 0x9A8EE1AC'u32 # csel x12, x13, x14, al
+  check word(code, 20) == 0xF85F8020'u32
+  check word(code, 24) == 0xB84000A4'u32
+  check word(code, 28) == 0xF84FF0E6'u32
+  check word(code, 32) == 0xF8100062'u32
+  check word(code, 36) == 0xB8064128'u32
+  check word(code, 40) == 0xF800016A'u32
+  check word(code, 44) == 0xD65F03C0'u32
+
 test "aarch64 branches patch relocations":
   var ops = initVecAssembler(0)
   dynasm ops:

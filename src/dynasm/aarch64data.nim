@@ -53,6 +53,8 @@ type
     fMemU0    ## byte lane ldrb/strb: Ubits(10,12), unscaled
     fMem9     ## pre/post-index ldr/str: Sbits(12,9)
     fPair     ## ldp/stp: Sscaled(15,7,s)
+    fCsel     ## csel/csinc: R(0), R(5), R(16) + cond at 12
+    fMemU9    ## ldur/stur: signed 9-bit unscaled at 12
     fMemX     ## register-offset ldr/str: ExtendsX + S bit
     fBr       ## b/bl/b.cond/ldr-literal + relocation
     fCbx      ## cbz/cbnz: R(0) + BCOND relocation
@@ -487,6 +489,33 @@ proc a64Entries*(mn: string): seq[A64Entry] =
       (0x1A9F07E0'u32, [asW, asCond, asNone, asNone, asNone], fCSet, -1),
       (0x9A9F07E0'u32, [asX, asCond, asNone, asNone, asNone], fCSet, -1),
     ]
+  of "csel":
+    @[
+      # Conditional select: cond field ORed in directly (no inversion;
+      # al/nv permitted: always/never select).
+      (0x9A800000'u32, [asX, asX, asX, asCond, asNone], fCsel, -1),
+      (0x1A800000'u32, [asW, asW, asW, asCond, asNone], fCsel, -1),
+    ]
+  of "csinc":
+    @[
+      (0x9A800400'u32, [asX, asX, asX, asCond, asNone], fCsel, -1),
+      (0x1A800400'u32, [asW, asW, asW, asCond, asNone], fCsel, -1),
+    ]
+  of "ldur":
+    @[
+      # Unscaled signed 9-bit offset (-256..255), no writeback.
+      (0xF8400000'u32, [asX, asMemOff, asNone, asNone, asNone], fMemU9, -1),
+      (0xF8400000'u32, [asX, asMemBase, asNone, asNone, asNone], fMemU9, -1),
+      (0xB8400000'u32, [asW, asMemOff, asNone, asNone, asNone], fMemU9, -1),
+      (0xB8400000'u32, [asW, asMemBase, asNone, asNone, asNone], fMemU9, -1),
+    ]
+  of "stur":
+    @[
+      (0xF8000000'u32, [asX, asMemOff, asNone, asNone, asNone], fMemU9, -1),
+      (0xF8000000'u32, [asX, asMemBase, asNone, asNone, asNone], fMemU9, -1),
+      (0xB8000000'u32, [asW, asMemOff, asNone, asNone, asNone], fMemU9, -1),
+      (0xB8000000'u32, [asW, asMemBase, asNone, asNone, asNone], fMemU9, -1),
+    ]
   of "tbz":
     @[
       (0x36000000'u32, [asX, asImm, asLbl, asNone, asNone], fTbx, AarchTbz),
@@ -661,12 +690,13 @@ proc a64Entries*(mn: string): seq[A64Entry] =
   else:
     @[]
 
-proc a64Mnemonics*(): array[67, string] =
+proc a64Mnemonics*(): array[71, string] =
   ["mov", "mov.inverted", "mov.logical", "movz", "movn", "movk",
     "add", "adds", "sub", "subs", "cmp", "cmn",
     "and", "orr", "eor", "ands", "tst", "mvn", "neg",
     "lsl", "lsr", "asr", "mul", "madd", "msub", "sdiv", "udiv",
     "ldr", "str", "ldrb", "strb", "ldp", "stp",
+    "csel", "csinc", "ldur", "stur",
     "b", "bl", "br", "blr", "ret", "cbz", "cbnz", "tbz", "tbnz",
     "adr", "adrp", "nop", "hlt", "svc", "fmov", "fadd", "fsub",
     "fmul", "fdiv", "fmax", "fmin", "fneg", "fabs", "fsqrt",

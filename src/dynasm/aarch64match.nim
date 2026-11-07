@@ -317,9 +317,9 @@ proc a64Classify(mn: string, node: NimNode,
       return A64Arg(shape: asMod, node: node)
     if n == "pre":
       return A64Arg(shape: asPre, node: node)
-    if mn == "cset" and n in a64CondNames:
-      # Scoped to cset: a bare `eq` elsewhere stays a dynamic
-      # immediate (a Nim variable may legitimately be named so).
+    if mn in ["cset", "csel", "csinc"] and n in a64CondNames:
+      # Scoped to cond-select mnemonics: a bare `eq` elsewhere stays
+      # a dynamic immediate (a Nim variable may be named so).
       return A64Arg(shape: asCond, node: node)
     # Anything else: a dynamic immediate expression (a bare Nim
     # identifier evaluates at runtime). Matches rs, where unknown
@@ -821,6 +821,20 @@ proc a64Emit*(mn: string, entry: A64Entry, args: seq[NimNode],
     # CSET reads the inverted condition.
     let cField = newLit(int(entry.base) + ((cbits xor 1) shl 12))
     return quote do: a64CSet(`o`, `cField`, `d`)
+  of fCsel:
+    let (d, s1, s2) = (regExpr(args[0], aliases),
+      regExpr(args[1], aliases), regExpr(args[2], aliases))
+    if args[3].kind != nnkIdent:
+      error("dynasm: '" & mn & "' condition must be a name like " &
+        "eq, ne, lt or gt", args[3])
+    let cname = a64ResolveIdent(args[3].strVal, aliases)
+    let cbits = a64CondBitsOf(cname)
+    if cbits < 0:
+      error("dynasm: '" & mn & "' unknown condition '" &
+        args[3].strVal & "'", args[3])
+    # No inversion (unlike cset); al/nv permitted: always/never select.
+    let cLit = newLit(cbits)
+    return quote do: a64Csel(`o`, `baseLit`, `d`, `s1`, `s2`, `cLit`)
   of fRRI12:
     var rd, rn, imm, shift, immNode: NimNode
     shift = newLit(0)
@@ -1019,6 +1033,14 @@ proc a64Emit*(mn: string, entry: A64Entry, args: seq[NimNode],
       off = immI64(args[2])
       a64CheckMem9(mn, args[2], stmt)
     return quote do: a64Mem9(`o`, `baseLit`, `rt`, `rn`, `off`)
+  of fMemU9:
+    let rt = regExpr(args[0], aliases)
+    let rn = regExpr(argInfo[1].mem.base, aliases)
+    var off: NimNode = newLit(0)
+    if argInfo[1].shape == asMemOff:
+      off = immI64(argInfo[1].mem.off)
+      a64CheckMem9(mn, argInfo[1].mem.off, stmt)
+    return quote do: a64MemU9(`o`, `baseLit`, `rt`, `rn`, `off`)
   of fPair:
     let (t1, t2) = (regExpr(args[0], aliases),
       regExpr(args[1], aliases))
