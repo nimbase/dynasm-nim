@@ -458,6 +458,10 @@ const ghashShiftMnemonics = ["psllq", "psrlq"]
 const chachaVecMnemonics = ["paddd"]
 const chachaShiftMnemonics = ["pslld", "psrld"]
 
+# Poly1305 SSE2 (4-lane kernel): even-lane dword multiply, qword add,
+# bitwise and. Same two-operand shapes as the GHASH/ChaCha sets.
+const polyVecMnemonics = ["pmuludq", "paddq", "pand"]
+
 # P2 VEX (AVX/AVX2/BMI2). Only the listed mnemonics are supported —
 # no general AVX.
 const vexArithMnemonics = ["vpaddd", "vpxor", "vpand", "vpaddq", "vpor"]
@@ -531,6 +535,8 @@ proc isDynasmWord(mn: string): bool =
       mn in ghashShiftMnemonics:
     return true
   if mn in chachaVecMnemonics or mn in chachaShiftMnemonics:
+    return true
+  if mn in polyVecMnemonics:
     return true
   if mn in vexArithMnemonics or mn == vexShufdMnemonic or
       mn in vexShiftMnemonics or mn == vexMovMnemonic or
@@ -640,6 +646,10 @@ proc suggestWord(mn: string): string =
     if d > 0 and d <= thresh:
       cands.add((d, w))
   for w in chachaShiftMnemonics:
+    let d = editDistance(mn, w)
+    if d > 0 and d <= thresh:
+      cands.add((d, w))
+  for w in polyVecMnemonics:
     let d = editDistance(mn, w)
     if d > 0 and d <= thresh:
       cands.add((d, w))
@@ -2231,6 +2241,7 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
             mn in aesIntMnemonics or mn in ghashVecMnemonics or
             mn in ghashImmMnemonics or mn in ghashShiftMnemonics or
             mn in chachaVecMnemonics or mn in chachaShiftMnemonics or
+            mn in polyVecMnemonics or
             mn in vexArithMnemonics or mn == vexShufdMnemonic or
             mn in vexShiftMnemonics or mn == vexMovMnemonic or
             mn == vexZeroMnemonic or mn == mulxMnemonic or
@@ -2675,6 +2686,20 @@ macro dynasm*(ops: untyped, body: untyped): untyped =
           let dynasmDst = `d`
           let dynasmImm = cast[int64](`immNode`)
           dynasmShiftQ(`o`, `mnLit`, dynasmDst, dynasmImm))
+      continue
+    elif mn in polyVecMnemonics:
+      if args.len != 2:
+        error(mn & " needs 2 args: dst, src", stmt)
+      validateSseCommon(mn, args, aliases, curIsX64, stmt)
+      validateGhash2op(mn, args, aliases, stmt)
+      let d = opAst(0)
+      let s = opAst(1)
+      if mn == "pmuludq":
+        result.add(quote do: dynasmPmuludq(`o`, `d`, `s`, `isX64Lit`))
+      elif mn == "paddq":
+        result.add(quote do: dynasmPaddq(`o`, `d`, `s`, `isX64Lit`))
+      else:
+        result.add(quote do: dynasmPand(`o`, `d`, `s`, `isX64Lit`))
       continue
     elif mn in vexArithMnemonics:
       if args.len != 3:

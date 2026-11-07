@@ -1208,6 +1208,34 @@ proc encPaddRegMem*(a: var auto, dst: Register, mem: MemOp,
     isX64: bool) =
   encSseRegMem(a, 0x66'u8, 0xFE'u8, dst, mem, isX64)
 
+# --------------------------------------------------------------------------
+# Poly1305 SSE2 set (4-lane kernel): pmuludq (66 0F F4 — the XMM form
+# takes 66, not F3; F3 decodes as the MMX form, verified against
+# clang/otool), paddq (66 0F D4), pand (66 0F DB). pmuludq mem form
+# reads 64 bits (implicit in the encoding, same ModRM as m128).
+# --------------------------------------------------------------------------
+
+proc encPmuludqRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0xF4'u8, dst, src)
+
+proc encPmuludqRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0xF4'u8, dst, mem, isX64)
+
+proc encPaddqRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0xD4'u8, dst, src)
+
+proc encPaddqRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0xD4'u8, dst, mem, isX64)
+
+proc encPandRegReg*(a: var auto, dst, src: Register) =
+  encSseRegReg(a, 0x66'u8, 0xDB'u8, dst, src)
+
+proc encPandRegMem*(a: var auto, dst: Register, mem: MemOp,
+    isX64: bool) =
+  encSseRegMem(a, 0x66'u8, 0xDB'u8, dst, mem, isX64)
+
 proc shiftGroupDigit*(mn: string): tuple[opcode: uint8, digit: uint8] =
   ## Imm8 shift groups. NB: /2 is RIGHT (psrl), /6 is LEFT (psll) —
   ## the reverse of the naive guess; verified against clang. The VEX

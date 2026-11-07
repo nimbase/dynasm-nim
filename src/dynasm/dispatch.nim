@@ -571,6 +571,30 @@ proc dynasmPadd*(a: var auto, dst, src: Operand, isX64: bool) =
   else:
     raise impossibleRelocation("unsupported paddd operands")
 
+proc dynasmPmuludq*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encPmuludqRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encPmuludqRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported pmuludq operands")
+
+proc dynasmPaddq*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encPaddqRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encPaddqRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported paddq operands")
+
+proc dynasmPand*(a: var auto, dst, src: Operand, isX64: bool) =
+  if dst.kind == okReg and src.kind == okReg:
+    encPandRegReg(a, dst.reg, src.reg)
+  elif dst.kind == okReg and src.kind == okMem:
+    encPandRegMem(a, dst.reg, src.mem, isX64)
+  else:
+    raise impossibleRelocation("unsupported pand operands")
+
 proc dynasmShiftQ*(a: var auto, mn: string, dst: Operand, imm: int64) =
   if imm < 0 or imm > 255:
     raise impossibleRelocation(mn & " imm8 out of range 0-255")
